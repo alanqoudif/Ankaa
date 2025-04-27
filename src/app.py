@@ -21,9 +21,91 @@ from ui.components import (
 from utils.model_utils import check_model_availability, get_recommended_models
 from utils.ollama_utils import list_ollama_models, is_ollama_running
 
-# Set page configuration
+# Dictionary for translations
+TRANSLATIONS = {
+    "en": {
+        "app_title": "Sultanate Legal AI Assistant",
+        "app_description": "An AI assistant for answering questions about Omani laws",
+        "sidebar_title": "Settings",
+        "language": "Language",
+        "model_source": "Model Source",
+        "local_model": "Local Model",
+        "ollama": "Ollama",
+        "model_selection": "Model Selection",
+        "top_k": "Number of sources to retrieve",
+        "system_status": "System Status",
+        "load_documents": "Load Documents",
+        "create_embeddings": "Create Embeddings",
+        "initialize_system": "Initialize System",
+        "setup_all": "Setup All (Load, Embed & Initialize)",
+        "documents_loaded": "Documents loaded",
+        "embeddings_created": "Embeddings created",
+        "system_initialized": "System initialized",
+        "chat_interface": "Chat Interface",
+        "ask_placeholder": "Ask a question about Omani laws...",
+        "processing": "Processing your question...",
+        "searching": "Searching for relevant information...",
+        "view_sources": "View Sources",
+        "source": "Source",
+        "content": "Content",
+        "welcome_title": "Welcome to the Sultanate Legal AI Assistant!",
+        "welcome_message": "I'm here to help answer your questions about Omani laws. To get started:",
+        "welcome_step1": "1. Load the legal documents using the 'Load Documents' button",
+        "welcome_step2": "2. Create embeddings using the 'Create Embeddings' button",
+        "welcome_step3": "3. Initialize the system using the 'Initialize System' button",
+        "welcome_step4": "4. Or simply click 'Setup All' to do all three steps at once",
+        "welcome_step5": "5. Ask your questions in the chat box below",
+        "ollama_not_running": "Ollama is not running. Please start Ollama to use Ollama models.",
+        "no_ollama_models": "No Ollama models found. Please pull at least one model using 'ollama pull <model_name>'."
+    },
+    "ar": {
+        "app_title": "المساعد القانوني الذكي لسلطنة عمان",
+        "app_description": "مساعد ذكاء اصطناعي للإجابة على الأسئلة حول القوانين العمانية",
+        "sidebar_title": "الإعدادات",
+        "language": "اللغة",
+        "model_source": "مصدر النموذج",
+        "local_model": "نموذج محلي",
+        "ollama": "أولاما",
+        "model_selection": "اختيار النموذج",
+        "top_k": "عدد المصادر المراد استرجاعها",
+        "system_status": "حالة النظام",
+        "load_documents": "تحميل المستندات",
+        "create_embeddings": "إنشاء التضمينات",
+        "initialize_system": "تهيئة النظام",
+        "setup_all": "إعداد الكل (تحميل، تضمين وتهيئة)",
+        "documents_loaded": "تم تحميل المستندات",
+        "embeddings_created": "تم إنشاء التضمينات",
+        "system_initialized": "تم تهيئة النظام",
+        "chat_interface": "واجهة المحادثة",
+        "ask_placeholder": "اسأل سؤالاً حول القوانين العمانية...",
+        "processing": "جاري معالجة سؤالك...",
+        "searching": "جاري البحث عن المعلومات ذات الصلة...",
+        "view_sources": "عرض المصادر",
+        "source": "المصدر",
+        "content": "المحتوى",
+        "welcome_title": "مرحبًا بك في المساعد القانوني الذكي لسلطنة عمان!",
+        "welcome_message": "أنا هنا للمساعدة في الإجابة على أسئلتك حول القوانين العمانية. للبدء:",
+        "welcome_step1": "1. قم بتحميل المستندات القانونية باستخدام زر 'تحميل المستندات'",
+        "welcome_step2": "2. قم بإنشاء التضمينات باستخدام زر 'إنشاء التضمينات'",
+        "welcome_step3": "3. قم بتهيئة النظام باستخدام زر 'تهيئة النظام'",
+        "welcome_step4": "4. أو ببساطة انقر على 'إعداد الكل' للقيام بالخطوات الثلاث دفعة واحدة",
+        "welcome_step5": "5. اطرح أسئلتك في مربع الدردشة أدناه",
+        "ollama_not_running": "أولاما غير مشغل. يرجى تشغيل أولاما لاستخدام نماذج أولاما.",
+        "no_ollama_models": "لم يتم العثور على نماذج أولاما. يرجى سحب نموذج واحد على الأقل باستخدام 'ollama pull <اسم_النموذج>'."
+    }
+}
+
+# Initialize session state for language if not exists
+if 'language' not in st.session_state:
+    st.session_state.language = "en"
+
+# Function to get translated text
+def t(key):
+    return TRANSLATIONS[st.session_state.language][key]
+
+# Set page config
 st.set_page_config(
-    page_title="Sultanate Legal AI Assistant",
+    page_title=t("app_title"),
     page_icon="⚖️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -60,17 +142,32 @@ render_header()
 with st.sidebar:
     st.markdown("## System Configuration")
     
+    # Language selection
+    selected_language = st.selectbox(
+        t("language"),
+        options=["English", "العربية"],
+        index=0 if st.session_state.language == "en" else 1
+    )
+
+    # Update language in session state
+    if selected_language == "English" and st.session_state.language != "en":
+        st.session_state.language = "en"
+        st.rerun()
+    elif selected_language == "العربية" and st.session_state.language != "ar":
+        st.session_state.language = "ar"
+        st.rerun()
+
     # Model selection
     st.markdown("### LLM Model")
     
     # Model source selection
     model_source = st.radio(
-        "Model Source",
-        options=["Local Model", "Ollama"],
+        t("model_source"),
+        options=[t("local_model"), t("ollama")],
         horizontal=True
     )
     
-    use_ollama = model_source == "Ollama"
+    use_ollama = model_source == t("ollama")
     
     if use_ollama:
         # Check if Ollama is running
@@ -79,24 +176,24 @@ with st.sidebar:
             ollama_models = list_ollama_models()
             if ollama_models:
                 ollama_model_names = [model.get("name") for model in ollama_models]
-                selected_ollama_model = st.selectbox("Select Ollama Model", ollama_model_names)
+                selected_ollama_model = st.selectbox(t("model_selection"), ollama_model_names)
                 model_path = "" # Not used with Ollama
             else:
-                st.warning("No Ollama models found. Please pull some models using 'ollama pull <model_name>'")
+                st.warning(t("no_ollama_models"))
                 selected_ollama_model = "llama2"
                 model_path = ""
         else:
-            st.error("Ollama is not running. Please start Ollama and refresh this page.")
+            st.error(t("ollama_not_running"))
             selected_ollama_model = "llama2"
             model_path = ""
     else:
         # Local model selection
         models = get_recommended_models()
         model_options = ["Custom Path"] + [model["name"] for model in models]
-        selected_model = st.selectbox("Select Model", model_options)
+        selected_model = st.selectbox(t("model_selection"), model_options)
         
         if selected_model == "Custom Path":
-            model_path = st.text_input("Model Path", value=DEFAULT_MODEL_PATH)
+            model_path = st.text_input(t("model_selection"), value=DEFAULT_MODEL_PATH)
         else:
             # Find the selected model in the list
             selected_model_info = next((model for model in models if model["name"] == selected_model), None)
@@ -112,13 +209,13 @@ with st.sidebar:
     
     # Retrieval options
     st.markdown("### Retrieval Options")
-    top_k = st.slider("Number of Documents to Retrieve", min_value=1, max_value=10, value=4, step=1)
+    top_k = st.slider(t("top_k"), min_value=1, max_value=10, value=4, step=1)
     
     # Initialize system
     init_col1, init_col2 = st.columns(2)
     with init_col1:
-        if st.button("Load Documents"):
-            with st.spinner("Loading documents..."):
+        if st.button(t("load_documents")):
+            with st.spinner(t("load_documents")):
                 # Create directories if they don't exist
                 os.makedirs(DATA_DIR, exist_ok=True)
                 os.makedirs(MODEL_DIR, exist_ok=True)
@@ -139,11 +236,11 @@ with st.sidebar:
                         st.error("Failed to load documents. Please check the console for errors.")
     
     with init_col2:
-        if st.button("Create Embeddings"):
+        if st.button(t("create_embeddings")):
             if not st.session_state.documents_loaded:
                 st.error("Please load documents first.")
             else:
-                with st.spinner("Creating embeddings..."):
+                with st.spinner(t("create_embeddings")):
                     # Create embeddings
                     embedder = DocumentEmbedder(persist_directory=CHROMA_DIR)
                     embedder.create_embeddings(st.session_state.documents)
@@ -152,18 +249,32 @@ with st.sidebar:
                     st.session_state.embeddings_created = True
                     st.success("Embeddings created successfully.")
     
-    if st.button("Initialize System"):
-        if not st.session_state.embeddings_created:
-            st.error("Please load documents and create embeddings first.")
-        elif not use_ollama and not os.path.exists(model_path):
-            st.error(f"Model file not found at {model_path}. Please download the model or update the path.")
-        elif use_ollama and not is_ollama_running():
-            st.error("Ollama is not running. Please start Ollama and try again.")
+    # Setup All button (does all three steps)
+    if st.button(t("setup_all"), type="primary", use_container_width=True):
+        # Step 1: Load documents
+        with st.spinner(t("load_documents")):
+            document_loader = LegalDocumentLoader(DATA_DIR)
+            documents = document_loader.load_documents(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+            st.session_state.documents = documents
+            st.session_state.documents_loaded = len(documents)
+        
+        # Step 2: Create embeddings
+        with st.spinner(t("create_embeddings")):
+            embedder = DocumentEmbedder(persist_directory=CHROMA_DIR)
+            embedder.create_embeddings(st.session_state.documents)
+            st.session_state.embedder = embedder
+            st.session_state.embeddings_created = True
+        
+        # Step 3: Initialize system
+        if not model_path:
+            st.error("Please select a valid model!")
         else:
-            with st.spinner("Initializing system..."):
-                # Initialize retriever and QA chain
+            with st.spinner(t("initialize_system")):
+                # Create retriever
                 retriever = LegalDocumentRetriever(st.session_state.embedder, top_k=top_k)
+                st.session_state.retriever = retriever
                 
+                # Create QA chain
                 if use_ollama:
                     qa_chain = LegalQAChain(
                         use_ollama=True,
@@ -176,7 +287,6 @@ with st.sidebar:
                     qa_chain = LegalQAChain(model_path=model_path)
                     model_name = os.path.basename(model_path)
                 
-                st.session_state.retriever = retriever
                 st.session_state.qa_chain = qa_chain
                 st.session_state.initialized = True
                 st.session_state.model_loaded = True
@@ -202,7 +312,7 @@ with st.sidebar:
     """)
 
 # Main content area - Chat interface
-st.markdown("## Chat Interface")
+st.markdown(f"## {t('chat_interface')}")
 
 # Display chat messages
 for msg_idx, message in enumerate(st.session_state.messages):
@@ -211,15 +321,15 @@ for msg_idx, message in enumerate(st.session_state.messages):
     
     # Show sources after assistant messages if available
     if message["role"] == "assistant" and "sources" in message:
-        with st.expander("View Sources", expanded=False):
+        with st.expander(t("view_sources"), expanded=False):
             for i, source in enumerate(message["sources"]):
-                st.markdown(f"**Source {i+1}:** {source['source']}")
+                st.markdown(f"**{t('source')} {i+1}:** {source['source']}")
                 # Use unique key combining message index, source index and timestamp
                 unique_key = f"source_{msg_idx}_{i}_{hash(message.get('timestamp', ''))}_{hash(source.get('source', ''))}"  
-                st.text_area(f"Content {i+1}", source["content"], height=150, key=unique_key)
+                st.text_area(f"{t('content')} {i+1}", source["content"], height=150, key=unique_key)
 
 # Chat input
-if prompt := st.chat_input("Ask a question about Omani laws..."):
+if prompt := st.chat_input(t("ask_placeholder")):
     # Add user message to chat history
     st.session_state.messages.append({"role": "user", "content": prompt})
     
@@ -232,7 +342,7 @@ if prompt := st.chat_input("Ask a question about Omani laws..."):
         response = "The system has not been initialized yet. Please load documents, create embeddings, and initialize the system using the sidebar controls."
         sources = []
     else:
-        with st.spinner("Searching for relevant information..."):
+        with st.spinner(t("searching")):
             # Retrieve relevant documents with higher k to ensure we get enough relevant content
             documents = st.session_state.retriever.retrieve(prompt, k=top_k * 2)
             
@@ -289,16 +399,16 @@ if prompt := st.chat_input("Ask a question about Omani laws..."):
     
     # Show sources if available
     if sources:
-        with st.expander("View Sources", expanded=False):
+        with st.expander(t("view_sources"), expanded=False):
             for i, source in enumerate(sources):
-                st.markdown(f"**Source {i+1}:** {source['source']}")
+                st.markdown(f"**{t('source')} {i+1}:** {source['source']}")
                 # Use unique key combining timestamp and source
                 current_time = str(int(time.time()))
                 unique_key = f"current_source_{i}_{hash(current_time)}_{hash(source.get('source', ''))}"  
-                st.text_area(f"Content {i+1}", source["content"], height=150, key=unique_key)
+                st.text_area(f"{t('content')} {i+1}", source["content"], height=150, key=unique_key)
 
 # Instructions for first-time users
-if not st.session_state.messages:
+if not st.session_state.get("messages", []):
     render_welcome_message()
 
 
