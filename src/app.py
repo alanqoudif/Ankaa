@@ -370,7 +370,11 @@ with st.sidebar:
                     st.session_state.tts_engine = TextToSpeech()
                     
                     # Initialize document comparator
-                    st.session_state.document_comparator = DocumentComparator(st.session_state.embedder)
+                    st.session_state.document_comparator = DocumentComparator(
+                        retriever=st.session_state.embedder,
+                        llm_or_chain=st.session_state.qa_chain,
+                        language=st.session_state.language
+                    )
                     
                     st.success(t("system_initialized"))
     
