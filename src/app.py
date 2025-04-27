@@ -4,6 +4,7 @@ Provides a Streamlit interface for interacting with the legal QA system.
 """
 
 import os
+import time
 import streamlit as st
 from document_loader import LegalDocumentLoader
 from embeddings import DocumentEmbedder
@@ -204,7 +205,7 @@ with st.sidebar:
 st.markdown("## Chat Interface")
 
 # Display chat messages
-for message in st.session_state.messages:
+for msg_idx, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
     
@@ -213,7 +214,9 @@ for message in st.session_state.messages:
         with st.expander("View Sources", expanded=False):
             for i, source in enumerate(message["sources"]):
                 st.markdown(f"**Source {i+1}:** {source['source']}")
-                st.text_area(f"Content {i+1}", source["content"], height=150, key=f"source_{i}_{len(st.session_state.messages)}")
+                # Use unique key combining message index, source index and timestamp
+                unique_key = f"source_{msg_idx}_{i}_{hash(message.get('timestamp', ''))}_{hash(source.get('source', ''))}"  
+                st.text_area(f"Content {i+1}", source["content"], height=150, key=unique_key)
 
 # Chat input
 if prompt := st.chat_input("Ask a question about Omani laws..."):
@@ -230,11 +233,28 @@ if prompt := st.chat_input("Ask a question about Omani laws..."):
         sources = []
     else:
         with st.spinner("Searching for relevant information..."):
-            # Retrieve relevant documents
-            documents = st.session_state.retriever.retrieve(prompt)
+            # Retrieve relevant documents with higher k to ensure we get enough relevant content
+            documents = st.session_state.retriever.retrieve(prompt, k=top_k * 2)
             
-            # Prepare context for the LLM
-            context = st.session_state.retriever.get_relevant_text(prompt)
+            # Filter documents more precisely to find the most relevant ones for this specific query
+            # This helps ensure we're reading files that are directly related to the user's question
+            filtered_documents = []
+            for doc in documents:
+                # Simple relevance check - can be enhanced with more sophisticated methods
+                if any(term.lower() in doc.page_content.lower() for term in prompt.lower().split()):
+                    filtered_documents.append(doc)
+            
+            # Use at least top_k documents, even if filtering removed some
+            if len(filtered_documents) < top_k and len(documents) >= top_k:
+                filtered_documents = documents[:top_k]
+            
+            # Prepare context for the LLM using the filtered documents
+            context = ""
+            for doc in filtered_documents:
+                source = doc.metadata.get("source", "Unknown source")
+                if "/" in source:
+                    source = source.split("/")[-1]
+                context += f"\nSource: {source}\n{doc.page_content}\n\n"
             
             # Generate answer
             response = st.session_state.qa_chain.answer_question(prompt, context)
@@ -255,7 +275,8 @@ if prompt := st.chat_input("Ask a question about Omani laws..."):
     # Add assistant response to chat history with sources
     message = {
         "role": "assistant", 
-        "content": response
+        "content": response,
+        "timestamp": str(int(time.time()))
     }
     if sources:
         message["sources"] = sources
@@ -271,7 +292,10 @@ if prompt := st.chat_input("Ask a question about Omani laws..."):
         with st.expander("View Sources", expanded=False):
             for i, source in enumerate(sources):
                 st.markdown(f"**Source {i+1}:** {source['source']}")
-                st.text_area(f"Content {i+1}", source["content"], height=150, key=f"source_{i}_{len(st.session_state.messages)}")
+                # Use unique key combining timestamp and source
+                current_time = str(int(time.time()))
+                unique_key = f"current_source_{i}_{hash(current_time)}_{hash(source.get('source', ''))}"  
+                st.text_area(f"Content {i+1}", source["content"], height=150, key=unique_key)
 
 # Instructions for first-time users
 if not st.session_state.messages:

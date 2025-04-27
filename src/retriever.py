@@ -27,18 +27,22 @@ class LegalDocumentRetriever:
         self.embedder = embedder
         self.top_k = top_k
     
-    def retrieve(self, query: str) -> List[Document]:
+    def retrieve(self, query: str, k: int = None) -> List[Document]:
         """
         Retrieve relevant documents based on the query.
         
         Args:
             query: User query
+            k: Number of documents to retrieve (overrides self.top_k if provided)
             
         Returns:
             List of relevant Document objects
         """
+        # Use provided k or default to self.top_k
+        top_k = k if k is not None else self.top_k
+        
         # Perform similarity search
-        documents = self.embedder.similarity_search(query, k=self.top_k)
+        documents = self.embedder.similarity_search(query, k=top_k)
         return documents
     
     def get_relevant_text(self, query: str) -> str:
