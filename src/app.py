@@ -215,8 +215,8 @@ with st.sidebar:
     st.markdown("### Retrieval Options")
     top_k = st.slider(t("top_k"), min_value=1, max_value=10, value=4, step=1)
     
-    # Initialize system
-    init_col1, init_col2 = st.columns(2)
+    # Initialize system buttons
+    init_col1, init_col2, init_col3 = st.columns(3)
     with init_col1:
         if st.button(t("load_documents")):
             with st.spinner(t("load_documents")):
@@ -288,6 +288,38 @@ with st.sidebar:
                         import traceback
                         st.error(traceback.format_exc())
     
+    # Add a third column for the Initialize System button
+    with init_col3:
+        if st.button(t("initialize_system")):
+            if not st.session_state.get("embeddings_created", False):
+                st.error(t("create_embeddings_first"))
+            elif not model_path and not (use_ollama and selected_ollama_model):
+                st.error(t("no_model_selected"))
+            else:
+                with st.spinner(t("initialize_system")):
+                    # Create retriever
+                    retriever = LegalDocumentRetriever(st.session_state.embedder, top_k=top_k)
+                    st.session_state.retriever = retriever
+                    
+                    # Create QA chain
+                    if use_ollama:
+                        qa_chain = LegalQAChain(
+                            use_ollama=True,
+                            ollama_model=selected_ollama_model,
+                            temperature=0.1,
+                            max_tokens=2000
+                        )
+                        model_name = f"Ollama: {selected_ollama_model}"
+                    else:
+                        qa_chain = LegalQAChain(model_path=model_path)
+                        model_name = os.path.basename(model_path)
+                    
+                    st.session_state.qa_chain = qa_chain
+                    st.session_state.initialized = True
+                    st.session_state.model_loaded = True
+                    st.session_state.model_name = model_name
+                    st.success(t("system_initialized"))
+    
     # Setup All button (does all three steps)
     if st.button(t("setup_all"), type="primary", use_container_width=True):
         # Step 1: Load documents
@@ -343,7 +375,7 @@ with st.sidebar:
                 st.error(traceback.format_exc())
         
         # Step 3: Initialize system
-        if not model_path:
+        if not model_path and not (use_ollama and selected_ollama_model):
             st.error(t("no_model_selected"))
         else:
             with st.spinner(t("initialize_system")):
@@ -371,12 +403,15 @@ with st.sidebar:
                 st.success(t("system_initialized"))
     
     # System status
+    # Determine if a valid model is selected
+    valid_model_selected = (model_path and os.path.exists(model_path)) or (use_ollama and selected_ollama_model)
+    
     render_system_status({
         "documents_loaded": st.session_state.documents_loaded,
         "embeddings_created": st.session_state.embeddings_created,
-        "model_loaded": st.session_state.model_loaded,
-        "model_name": st.session_state.model_name,
-        "system_initialized": st.session_state.initialized
+        "model_loaded": valid_model_selected,
+        "model_name": selected_ollama_model if use_ollama else (os.path.basename(model_path) if model_path else ""),
+        "system_initialized": st.session_state.get("initialized", False)
     })
     
     # About section
