@@ -148,8 +148,9 @@ def render_welcome_message():
         </ol>
         <p><strong>Example questions:</strong></p>
         <ul>
-            <li>"What is the punishment for theft according to Omani laws?"</li>
-            <li>"ما هي عقوبة السرقة وفقًا للقوانين العمانية؟"</li>
+            <li>"على ماذا ينص قانون الدفاع المدني العماني؟"</li>
+            <li>"What are the provisions of the Omani Civil Defense Law?"</li>
+            <li>"ما هي الإجراءات المتبعة في حالات الطوارئ حسب قانون الدفاع المدني؟"</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
