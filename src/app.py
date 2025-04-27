@@ -628,9 +628,16 @@ if st.session_state.initialized:
     
     # Check if Vosk model exists
     vosk_model_path = os.path.join(MODEL_DIR, "vosk-model-small-en-us-0.15")
-    if not os.path.exists(vosk_model_path):
+    vosk_model_exists = os.path.exists(vosk_model_path) and os.path.isdir(vosk_model_path) and len(os.listdir(vosk_model_path)) > 0
+    
+    if not vosk_model_exists:
         # Show download button for Vosk model
-        download_vosk_model()
+        if st.button(t("download_vosk_model")):
+            from utils.voice_utils import download_vosk_model as dl_vosk_model
+            model_path = dl_vosk_model()
+            if model_path and os.path.exists(model_path):
+                st.success(f"Vosk model downloaded to {model_path}")
+                st.rerun()
     
     # Voice input callback function
     def on_voice_input(text):
@@ -638,11 +645,32 @@ if st.session_state.initialized:
         st.session_state.messages.append({"role": "user", "content": text})
         st.rerun()
     
-    # Show voice input button if voice processor is available
-    if st.session_state.voice_processor:
+    # Initialize voice processor if it's not already initialized
+    if not st.session_state.voice_processor or not getattr(st.session_state.voice_processor, 'initialized', False):
+        if st.button("Initialize Voice Processor"):
+            try:
+                from utils.voice_utils import VoiceProcessor, TextToSpeech
+                
+                if vosk_model_exists:
+                    st.session_state.voice_processor = VoiceProcessor(use_vosk=True, model_path=vosk_model_path)
+                    st.info(f"Voice processor initialized with Vosk model at {vosk_model_path}")
+                else:
+                    st.session_state.voice_processor = VoiceProcessor(use_vosk=False)
+                    st.info("Voice processor initialized with Whisper API (requires internet connection)")
+                
+                # Initialize text-to-speech engine
+                language = "ar" if st.session_state.language == "ar" else "en"
+                st.session_state.tts_engine = TextToSpeech(use_pyttsx3=True, language=language)
+                
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error initializing voice processor: {e}")
+    
+    # Show voice input button if voice processor is available and initialized
+    if st.session_state.voice_processor and getattr(st.session_state.voice_processor, 'initialized', False):
         render_voice_input_button(on_voice_input)
     else:
-        st.warning(t("Voice input is not available. Please install the required dependencies."))
+        st.warning("Voice processor is not properly initialized. Please initialize it first.")
 
 # Chat input
 if prompt := st.chat_input(t("ask_placeholder")):

@@ -59,22 +59,26 @@ class VoiceProcessor:
         self.recording_thread = None
         self.sample_rate = 16000  # Default sample rate for Vosk
         self.initialized = False
+        self.init_error = None
         
         # Check if required libraries are available
         if not SOUNDDEVICE_AVAILABLE:
-            st.warning("sounddevice library is required for voice input. Install it with 'pip install sounddevice'.")
+            self.init_error = "sounddevice library is required for voice input. Install it with 'pip install sounddevice'."
+            st.warning(self.init_error)
             return
         
         # Initialize Vosk if selected
         if use_vosk:
             if not VOSK_AVAILABLE:
-                st.warning("Vosk library is required for offline voice recognition. Install it with 'pip install vosk'.")
+                self.init_error = "Vosk library is required for offline voice recognition. Install it with 'pip install vosk'."
+                st.warning(self.init_error)
                 return
             
             if model_path and os.path.exists(model_path) and os.path.isdir(model_path):
                 # Check if the model directory has content
                 if len(os.listdir(model_path)) == 0:
-                    st.warning(f"Vosk model directory exists but is empty: {model_path}")
+                    self.init_error = f"Vosk model directory exists but is empty: {model_path}"
+                    st.warning(self.init_error)
                     st.info("Please download a valid Vosk model using the download button.")
                     return
                     
@@ -85,19 +89,29 @@ class VoiceProcessor:
                     self.initialized = True
                     st.success("Vosk model initialized successfully!")
                 except Exception as e:
-                    st.error(f"Error initializing Vosk model: {e}")
+                    self.init_error = f"Error initializing Vosk model: {e}"
+                    st.error(self.init_error)
                     st.info("Please download a valid Vosk model using the download button.")
             else:
-                st.warning(f"Vosk model path not found or is not a directory: {model_path}")
+                self.init_error = f"Vosk model path not found or is not a directory: {model_path}"
+                st.warning(self.init_error)
                 st.info("Please download a valid Vosk model using the download button.")
         else:
             # Using Whisper API
             try:
                 import openai
+                # Check if API key is set
+                if not os.environ.get("OPENAI_API_KEY"):
+                    self.init_error = "OpenAI API key not set. Please set the OPENAI_API_KEY environment variable."
+                    st.warning(self.init_error)
+                    st.info("Alternatively, download and use the Vosk model for offline voice recognition.")
+                    return
+                    
                 self.initialized = True
                 st.success("Voice processor initialized with Whisper API")
             except ImportError:
-                st.error("OpenAI library is required for Whisper API. Install it with 'pip install openai'.")
+                self.init_error = "OpenAI library is required for Whisper API. Install it with 'pip install openai'."
+                st.error(self.init_error)
     
     def _audio_callback(self, indata, frames, time, status):
         """Callback function for audio recording."""
