@@ -40,7 +40,9 @@ TRANSLATIONS = {
         "setup_all": "Setup All (Load, Embed & Initialize)",
         "documents_loaded": "Documents loaded",
         "embeddings_created": "Embeddings created",
-        "system_initialized": "System initialized",
+        "system_initialized": "System initialized successfully",
+        "no_model_selected": "Please select a valid model!",
+        "create_embeddings_first": "Please create embeddings first!",
         "chat_interface": "Chat Interface",
         "ask_placeholder": "Ask a question about Omani laws...",
         "processing": "Processing your question...",
@@ -75,7 +77,9 @@ TRANSLATIONS = {
         "setup_all": "إعداد الكل (تحميل، تضمين وتهيئة)",
         "documents_loaded": "تم تحميل المستندات",
         "embeddings_created": "تم إنشاء التضمينات",
-        "system_initialized": "تم تهيئة النظام",
+        "system_initialized": "تم تهيئة النظام بنجاح",
+        "no_model_selected": "يرجى اختيار نموذج صالح!",
+        "create_embeddings_first": "يرجى إنشاء التضمينات أولاً!",
         "chat_interface": "واجهة المحادثة",
         "ask_placeholder": "اسأل سؤالاً حول القوانين العمانية...",
         "processing": "جاري معالجة سؤالك...",
@@ -237,8 +241,8 @@ with st.sidebar:
     
     with init_col2:
         if st.button(t("create_embeddings")):
-            if not st.session_state.documents_loaded:
-                st.error("Please load documents first.")
+            if not st.session_state.get("documents_loaded", 0):
+                st.error(t("create_embeddings_first"))
             else:
                 with st.spinner(t("create_embeddings")):
                     try:
@@ -340,7 +344,7 @@ with st.sidebar:
         
         # Step 3: Initialize system
         if not model_path:
-            st.error("Please select a valid model!")
+            st.error(t("no_model_selected"))
         else:
             with st.spinner(t("initialize_system")):
                 # Create retriever
@@ -364,7 +368,7 @@ with st.sidebar:
                 st.session_state.initialized = True
                 st.session_state.model_loaded = True
                 st.session_state.model_name = model_name
-                st.success("System initialized successfully.")
+                st.success(t("system_initialized"))
     
     # System status
     render_system_status({
