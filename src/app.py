@@ -168,7 +168,7 @@ with st.sidebar:
                         use_ollama=True,
                         ollama_model=selected_ollama_model,
                         temperature=0.1,
-                        max_tokens=max_tokens
+                        max_tokens=2000
                     )
                     model_name = f"Ollama: {selected_ollama_model}"
                 else:
