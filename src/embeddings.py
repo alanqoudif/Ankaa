@@ -13,6 +13,25 @@ import numpy as np
 from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
+# Import utility to filter complex metadata
+try:
+    from langchain_community.vectorstores.utils import filter_complex_metadata
+except ImportError:
+    # Fallback for older versions
+    def filter_complex_metadata(metadata):
+        """Filter out complex metadata that ChromaDB can't handle."""
+        filtered = {}
+        for key, value in metadata.items():
+            if isinstance(value, (str, int, float, bool)):
+                filtered[key] = value
+            elif isinstance(value, list) and all(isinstance(x, (str, int, float, bool)) for x in value):
+                # Convert lists of simple types to strings
+                filtered[key] = str(value)
+            else:
+                # Skip complex types
+                pass
+        return filtered
+
 # Use updated imports to avoid deprecation warnings
 try:
     from langchain_community.vectorstores import Chroma
@@ -83,8 +102,19 @@ class DocumentEmbedder:
             batch = documents[i:batch_end]
             print(f"Processing batch {(i // batch_size) + 1}/{total_batches} ({len(batch)} documents)")
             
-            # Add documents to vector store
-            self.vector_store.add_documents(batch)
+            # Filter complex metadata before adding documents
+            filtered_batch = []
+            for doc in batch:
+                # Create a new document with filtered metadata
+                filtered_metadata = filter_complex_metadata(doc.metadata)
+                filtered_doc = Document(
+                    page_content=doc.page_content,
+                    metadata=filtered_metadata
+                )
+                filtered_batch.append(filtered_doc)
+                
+            # Add documents with filtered metadata to vector store
+            self.vector_store.add_documents(filtered_batch)
             
             # Persist after each batch
             self.vector_store.persist()
@@ -108,8 +138,19 @@ class DocumentEmbedder:
         if self.vector_store is None:
             raise ValueError("Vector store not initialized. Please create embeddings first.")
         
-        # Add documents to vector store
-        self.vector_store.add_documents(documents)
+        # Filter complex metadata before adding documents
+        filtered_documents = []
+        for doc in documents:
+            # Create a new document with filtered metadata
+            filtered_metadata = filter_complex_metadata(doc.metadata)
+            filtered_doc = Document(
+                page_content=doc.page_content,
+                metadata=filtered_metadata
+            )
+            filtered_documents.append(filtered_doc)
+            
+        # Add documents with filtered metadata to vector store
+        self.vector_store.add_documents(filtered_documents)
         self.vector_store.persist()
     
     def similarity_search(self, query: str, k: int = 4) -> List[Document]:

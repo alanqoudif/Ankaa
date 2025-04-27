@@ -28,7 +28,15 @@ class LegalDocumentRetriever:
         """
         self.embedder = embedder
         self.top_k = top_k
-        self.document_loader = LegalDocumentLoader("src/data")
+        # Initialize document_loader lazily to avoid issues with Streamlit session state
+        self._document_loader = None
+        
+    @property
+    def document_loader(self):
+        """Lazy initialization of document_loader"""
+        if self._document_loader is None:
+            self._document_loader = LegalDocumentLoader("src/data")
+        return self._document_loader
     
     def retrieve(self, query: str, k: int = None) -> List[Document]:
         """

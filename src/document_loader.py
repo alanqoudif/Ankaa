@@ -90,11 +90,9 @@ class LegalDocumentLoader:
             # Analyze document structure
             structure = self.structure_analyzer.analyze_document_structure(full_text)
             
-            # Store structure information in metadata
-            metadata["structure"] = {
-                "article_count": structure["article_count"],
-                "section_count": structure["section_count"]
-            }
+            # Store structure information in metadata (as flat values to avoid ChromaDB errors)
+            metadata["article_count"] = structure["article_count"]
+            metadata["section_count"] = structure["section_count"]
             
             # Create chunks with overlap
             if full_text:
