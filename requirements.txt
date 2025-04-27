@@ -1,0 +1,15 @@
+langchain>=0.0.267
+langchain-community>=0.0.10
+chromadb>=0.4.18
+pymupdf>=1.23.7
+streamlit>=1.28.0
+sentence-transformers>=2.2.2
+llama-cpp-python>=0.2.19
+pydantic>=2.4.2
+python-dotenv>=1.0.0
+tqdm>=4.66.1
+numpy>=1.24.0
+faiss-cpu>=1.7.4
+transformers>=4.35.0
+torch>=2.1.0
+accelerate>=0.23.0
