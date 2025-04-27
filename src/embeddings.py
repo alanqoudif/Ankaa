@@ -13,24 +13,27 @@ import numpy as np
 from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-# Import utility to filter complex metadata
-try:
-    from langchain_community.vectorstores.utils import filter_complex_metadata
-except ImportError:
-    # Fallback for older versions
-    def filter_complex_metadata(metadata):
-        """Filter out complex metadata that ChromaDB can't handle."""
-        filtered = {}
-        for key, value in metadata.items():
-            if isinstance(value, (str, int, float, bool)):
-                filtered[key] = value
-            elif isinstance(value, list) and all(isinstance(x, (str, int, float, bool)) for x in value):
-                # Convert lists of simple types to strings
+# Custom function to filter complex metadata
+def filter_complex_metadata(metadata):
+    """Filter out complex metadata that ChromaDB can't handle."""
+    if not isinstance(metadata, dict):
+        # If metadata is not a dictionary, return an empty dict
+        return {}
+        
+    filtered = {}
+    for key, value in metadata.items():
+        if isinstance(value, (str, int, float, bool)):
+            filtered[key] = value
+        elif isinstance(value, list):
+            # Try to convert lists to strings
+            try:
                 filtered[key] = str(value)
-            else:
-                # Skip complex types
-                pass
-        return filtered
+            except:
+                pass  # Skip if conversion fails
+        else:
+            # Skip complex types
+            pass
+    return filtered
 
 # Use updated imports to avoid deprecation warnings
 try:
@@ -105,13 +108,22 @@ class DocumentEmbedder:
             # Filter complex metadata before adding documents
             filtered_batch = []
             for doc in batch:
-                # Create a new document with filtered metadata
-                filtered_metadata = filter_complex_metadata(doc.metadata)
-                filtered_doc = Document(
-                    page_content=doc.page_content,
-                    metadata=filtered_metadata
-                )
-                filtered_batch.append(filtered_doc)
+                try:
+                    # Create a new document with filtered metadata
+                    if hasattr(doc, 'metadata') and isinstance(doc.metadata, dict):
+                        filtered_metadata = filter_complex_metadata(doc.metadata)
+                        filtered_doc = Document(
+                            page_content=doc.page_content,
+                            metadata=filtered_metadata
+                        )
+                        filtered_batch.append(filtered_doc)
+                    else:
+                        # If doc doesn't have proper metadata, just use it as is
+                        filtered_batch.append(doc)
+                except Exception as e:
+                    print(f"Error filtering metadata: {e}")
+                    # In case of error, just use the document as is
+                    filtered_batch.append(doc)
                 
             # Add documents with filtered metadata to vector store
             self.vector_store.add_documents(filtered_batch)
@@ -141,13 +153,22 @@ class DocumentEmbedder:
         # Filter complex metadata before adding documents
         filtered_documents = []
         for doc in documents:
-            # Create a new document with filtered metadata
-            filtered_metadata = filter_complex_metadata(doc.metadata)
-            filtered_doc = Document(
-                page_content=doc.page_content,
-                metadata=filtered_metadata
-            )
-            filtered_documents.append(filtered_doc)
+            try:
+                # Create a new document with filtered metadata
+                if hasattr(doc, 'metadata') and isinstance(doc.metadata, dict):
+                    filtered_metadata = filter_complex_metadata(doc.metadata)
+                    filtered_doc = Document(
+                        page_content=doc.page_content,
+                        metadata=filtered_metadata
+                    )
+                    filtered_documents.append(filtered_doc)
+                else:
+                    # If doc doesn't have proper metadata, just use it as is
+                    filtered_documents.append(doc)
+            except Exception as e:
+                print(f"Error filtering metadata: {e}")
+                # In case of error, just use the document as is
+                filtered_documents.append(doc)
             
         # Add documents with filtered metadata to vector store
         self.vector_store.add_documents(filtered_documents)

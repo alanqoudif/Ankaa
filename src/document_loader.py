@@ -88,11 +88,15 @@ class LegalDocumentLoader:
                     full_text += text + "\n\n"
             
             # Analyze document structure
-            structure = self.structure_analyzer.analyze_document_structure(full_text)
+            try:
+                structure = self.structure_analyzer.analyze_document_structure(full_text)
+            except Exception as e:
+                print(f"Error analyzing document structure: {e}")
+                structure = {"articles": [], "sections": []}
             
             # Store structure information in metadata (as flat values to avoid ChromaDB errors)
-            metadata["article_count"] = structure["article_count"]
-            metadata["section_count"] = structure["section_count"]
+            metadata["article_count"] = len(structure.get("articles", []))
+            metadata["section_count"] = len(structure.get("sections", []))
             
             # Create chunks with overlap
             if full_text:
@@ -135,32 +139,36 @@ class LegalDocumentLoader:
                     chunks.append(chunk)
                 
                 # Create article-specific chunks
-                for article in structure["articles"]:
-                    article_metadata = metadata.copy()
-                    article_metadata["chunk_type"] = "article"
-                    article_metadata["article_id"] = article["id"]
-                    article_metadata["article_content"] = article["content"]
-                    
-                    documents.append(
-                        Document(
-                            page_content=article["content"],
-                            metadata=article_metadata
+                if "articles" in structure and structure["articles"]:
+                    for article in structure["articles"]:
+                        article_metadata = metadata.copy()
+                        article_metadata["chunk_type"] = "article"
+                        article_metadata["article_id"] = article["id"]
+                        # Avoid storing the full content in metadata
+                        article_metadata["article_title"] = article.get("title", "")
+                        
+                        documents.append(
+                            Document(
+                                page_content=article["content"],
+                                metadata=article_metadata
+                            )
                         )
-                    )
                 
                 # Create section-specific chunks
-                for section in structure["sections"]:
-                    section_metadata = metadata.copy()
-                    section_metadata["chunk_type"] = "section"
-                    section_metadata["section_id"] = section["id"]
-                    section_metadata["section_content"] = section["content"]
-                    
-                    documents.append(
-                        Document(
-                            page_content=section["content"],
-                            metadata=section_metadata
+                if "sections" in structure and structure["sections"]:
+                    for section in structure["sections"]:
+                        section_metadata = metadata.copy()
+                        section_metadata["chunk_type"] = "section"
+                        section_metadata["section_id"] = section["id"]
+                        # Avoid storing the full content in metadata
+                        section_metadata["section_title"] = section.get("title", "")
+                        
+                        documents.append(
+                            Document(
+                                page_content=section["content"],
+                                metadata=section_metadata
+                            )
                         )
-                    )
             
             pdf_document.close()
             

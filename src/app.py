@@ -148,6 +148,12 @@ if "show_sources" not in st.session_state:
     st.session_state.show_sources = False
 if "current_sources" not in st.session_state:
     st.session_state.current_sources = []
+if "embedder" not in st.session_state:
+    st.session_state.embedder = None
+if "retriever" not in st.session_state:
+    st.session_state.retriever = None
+if "qa_chain" not in st.session_state:
+    st.session_state.qa_chain = None
 
 # Render header
 render_header()
@@ -378,6 +384,10 @@ with st.sidebar:
                 # Store in session state
                 st.session_state.embedder = embedder
                 st.session_state.embeddings_created = True
+                # Make sure the embedder is properly initialized before continuing
+                if st.session_state.embedder is None:
+                    st.error("Failed to initialize embedder. Please try again.")
+                    st.stop()
                 st.success(t("embeddings_created"))
             except Exception as e:
                 st.error(f"Error creating embeddings: {str(e)}")
@@ -389,9 +399,18 @@ with st.sidebar:
             st.error(t("no_model_selected"))
         else:
             with st.spinner(t("initialize_system")):
+                # Check if embedder is initialized
+                if st.session_state.embedder is None:
+                    st.error("Embedder not initialized. Please create embeddings first.")
+                    st.stop()
+                    
                 # Create retriever
-                retriever = LegalDocumentRetriever(st.session_state.embedder, top_k=top_k)
-                st.session_state.retriever = retriever
+                try:
+                    retriever = LegalDocumentRetriever(st.session_state.embedder, top_k=top_k)
+                    st.session_state.retriever = retriever
+                except Exception as e:
+                    st.error(f"Error creating retriever: {str(e)}")
+                    st.stop()
                 
                 # Create QA chain
                 if use_ollama:
