@@ -241,13 +241,48 @@ with st.sidebar:
                 st.error("Please load documents first.")
             else:
                 with st.spinner(t("create_embeddings")):
-                    # Create embeddings
-                    embedder = DocumentEmbedder(persist_directory=CHROMA_DIR)
-                    embedder.create_embeddings(st.session_state.documents)
-                    
-                    st.session_state.embedder = embedder
-                    st.session_state.embeddings_created = True
-                    st.success("Embeddings created successfully.")
+                    try:
+                        # Use a progress bar for better user feedback
+                        progress_bar = st.progress(0)
+                        
+                        # Initialize embedder with optimized settings
+                        embedder = DocumentEmbedder(persist_directory=CHROMA_DIR)
+                        
+                        # Get total document count for progress calculation
+                        total_docs = len(st.session_state.documents)
+                        batch_size = 500
+                        total_batches = (total_docs + batch_size - 1) // batch_size
+                        
+                        # Process documents in smaller batches to avoid memory issues
+                        for i in range(0, total_docs, batch_size):
+                            batch_end = min(i + batch_size, total_docs)
+                            batch = st.session_state.documents[i:batch_end]
+                            
+                            # Update status message
+                            batch_num = (i // batch_size) + 1
+                            st.markdown(f"Processing batch {batch_num}/{total_batches} ({len(batch)} documents)")
+                            
+                            # Update progress bar
+                            progress = min(i / total_docs, 0.99) if total_docs > 0 else 0.99
+                            progress_bar.progress(progress)
+                            
+                            # Process this batch if it's the first one, otherwise add to existing embeddings
+                            if i == 0:
+                                embedder.create_embeddings(batch)
+                            else:
+                                embedder.add_documents(batch)
+                        
+                        # Complete the progress bar
+                        progress_bar.progress(1.0)
+                        
+                        # Store in session state
+                        st.session_state.embedder = embedder
+                        st.session_state.embeddings_created = True
+                        st.success(t("embeddings_created"))
+                    except Exception as e:
+                        st.error(f"Error creating embeddings: {str(e)}")
+                        import traceback
+                        st.error(traceback.format_exc())
     
     # Setup All button (does all three steps)
     if st.button(t("setup_all"), type="primary", use_container_width=True):
@@ -260,10 +295,48 @@ with st.sidebar:
         
         # Step 2: Create embeddings
         with st.spinner(t("create_embeddings")):
-            embedder = DocumentEmbedder(persist_directory=CHROMA_DIR)
-            embedder.create_embeddings(st.session_state.documents)
-            st.session_state.embedder = embedder
-            st.session_state.embeddings_created = True
+            try:
+                # Use a progress bar for better user feedback
+                progress_bar = st.progress(0)
+                
+                # Initialize embedder with optimized settings
+                embedder = DocumentEmbedder(persist_directory=CHROMA_DIR)
+                
+                # Get total document count for progress calculation
+                total_docs = len(st.session_state.documents)
+                batch_size = 500
+                total_batches = (total_docs + batch_size - 1) // batch_size
+                
+                # Process documents in smaller batches to avoid memory issues
+                for i in range(0, total_docs, batch_size):
+                    batch_end = min(i + batch_size, total_docs)
+                    batch = st.session_state.documents[i:batch_end]
+                    
+                    # Update status message
+                    batch_num = (i // batch_size) + 1
+                    st.markdown(f"Processing batch {batch_num}/{total_batches} ({len(batch)} documents)")
+                    
+                    # Update progress bar
+                    progress = min(i / total_docs, 0.99) if total_docs > 0 else 0.99
+                    progress_bar.progress(progress)
+                    
+                    # Process this batch if it's the first one, otherwise add to existing embeddings
+                    if i == 0:
+                        embedder.create_embeddings(batch)
+                    else:
+                        embedder.add_documents(batch)
+                
+                # Complete the progress bar
+                progress_bar.progress(1.0)
+                
+                # Store in session state
+                st.session_state.embedder = embedder
+                st.session_state.embeddings_created = True
+                st.success(t("embeddings_created"))
+            except Exception as e:
+                st.error(f"Error creating embeddings: {str(e)}")
+                import traceback
+                st.error(traceback.format_exc())
         
         # Step 3: Initialize system
         if not model_path:
