@@ -636,7 +636,7 @@ if st.session_state.initialized:
     
     if not vosk_model_exists:
         # Show download button for Vosk model
-        if st.button(t("download_vosk_model")):
+        if st.button(t("download_vosk_model"), key="download_vosk_model_app"):
             from utils.voice_utils import download_vosk_model as dl_vosk_model
             model_path = dl_vosk_model()
             if model_path and os.path.exists(model_path):
@@ -651,7 +651,7 @@ if st.session_state.initialized:
     
     # Initialize voice processor if it's not already initialized
     if not st.session_state.voice_processor or not getattr(st.session_state.voice_processor, 'initialized', False):
-        if st.button("Initialize Voice Processor"):
+        if st.button("Initialize Voice Processor", key="init_voice_processor"):
             try:
                 from utils.voice_utils import VoiceProcessor, TextToSpeech
                 

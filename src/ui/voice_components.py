@@ -182,7 +182,7 @@ def download_vosk_model():
     button_text = "Download Vosk Model for Offline Voice Recognition" if lang == "en" else "تحميل نموذج Vosk للتعرف على الصوت بدون إنترنت"
     downloading_text = "Downloading Vosk model..." if lang == "en" else "جاري تحميل نموذج Vosk..."
     
-    if st.button(button_text):
+    if st.button(button_text, key="download_vosk_model_component"):
         with st.spinner(downloading_text):
             from utils.voice_utils import download_vosk_model
             model_path = download_vosk_model()
