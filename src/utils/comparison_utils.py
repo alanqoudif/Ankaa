@@ -25,12 +25,25 @@ class DocumentComparator:
         self.retriever = retriever
         self.llm = llm
         self.language = language
+        self.initialized = False
         
-        # Initialize the comparison chain
-        self.comparison_chain = self._create_comparison_chain()
+        # Check if LLM is available
+        if self.llm is None:
+            import streamlit as st
+            st.error("LLM is not available for document comparison. Please initialize the system with a valid model.")
+            return
         
-        # Initialize the summarization chain
-        self.summarization_chain = self._create_summarization_chain()
+        try:
+            # Initialize the comparison chain
+            self.comparison_chain = self._create_comparison_chain()
+            
+            # Initialize the summarization chain
+            self.summarization_chain = self._create_summarization_chain()
+            
+            self.initialized = True
+        except Exception as e:
+            import streamlit as st
+            st.error(f"Error initializing document comparison: {e}")
     
     def _create_comparison_chain(self) -> LLMChain:
         """
@@ -214,14 +227,31 @@ class DocumentComparator:
         Returns:
             Dictionary with comparison results
         """
-        # Extract laws to compare and comparison topic
-        laws_to_compare, comparison_topic = self._extract_laws_and_topic(query)
+        import streamlit as st
         
-        if not laws_to_compare:
+        # Check if the comparator is initialized
+        if not getattr(self, 'initialized', False):
             return {
                 "success": False,
-                "message": "Could not identify laws to compare from your query. Please specify the laws you want to compare." if self.language == "en" else
-                           "لم أتمكن من تحديد القوانين المراد مقارنتها من استفسارك. يرجى تحديد القوانين التي ترغب في مقارنتها."
+                "message": "Document comparator is not properly initialized. Please initialize the system with a valid model." if self.language == "en" else
+                           "لم يتم تهيئة أداة المقارنة بشكل صحيح. يرجى تهيئة النظام باستخدام نموذج صالح."
+            }
+        
+        try:
+            # Extract laws to compare and comparison topic
+            laws_to_compare, comparison_topic = self._extract_laws_and_topic(query)
+            
+            if not laws_to_compare:
+                return {
+                    "success": False,
+                    "message": "Could not identify laws to compare from your query. Please specify the laws you want to compare." if self.language == "en" else
+                               "لم أتمكن من تحديد القوانين المراد مقارنتها من استفسارك. يرجى تحديد القوانين التي ترغب في مقارنتها."
+                }
+        except Exception as e:
+            st.error(f"Error extracting laws to compare: {e}")
+            return {
+                "success": False,
+                "message": f"Error processing comparison query: {str(e)}"
             }
         
         # Initialize results

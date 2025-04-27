@@ -493,12 +493,27 @@ with st.sidebar:
                 # Initialize document comparator
                 try:
                     from utils.comparison_utils import DocumentComparator
-                    st.session_state.document_comparator = DocumentComparator(
-                        retriever=st.session_state.retriever,
-                        llm=qa_chain.llm,
-                        language=st.session_state.language
-                    )
-                    st.info("Document comparison initialized successfully")
+                    
+                    # Make sure we have a valid LLM
+                    if hasattr(qa_chain, 'llm') and qa_chain.llm is not None:
+                        st.session_state.document_comparator = DocumentComparator(
+                            retriever=st.session_state.retriever,
+                            llm=qa_chain.llm,
+                            language=st.session_state.language
+                        )
+                        if getattr(st.session_state.document_comparator, 'initialized', False):
+                            st.success("Document comparison initialized successfully")
+                    else:
+                        # If qa_chain.llm is None, try to use the chain directly
+                        st.session_state.document_comparator = DocumentComparator(
+                            retriever=st.session_state.retriever,
+                            llm=qa_chain,  # Use the chain itself as the LLM
+                            language=st.session_state.language
+                        )
+                        if getattr(st.session_state.document_comparator, 'initialized', False):
+                            st.success("Document comparison initialized successfully")
+                        else:
+                            st.warning("Document comparison could not be initialized with the available LLM")
                 except Exception as e:
                     st.warning(f"Error initializing document comparison: {e}")
                 
