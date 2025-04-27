@@ -525,14 +525,43 @@ with st.sidebar:
     
     # Check if Vosk model exists
     vosk_model_path = os.path.join(MODEL_DIR, "vosk-model-small-en-us-0.15")
-    vosk_model_exists = os.path.exists(vosk_model_path)
+    vosk_model_exists = os.path.exists(vosk_model_path) and os.path.isdir(vosk_model_path) and len(os.listdir(vosk_model_path)) > 0
     
     # Display voice recognition status
     render_voice_status(is_available=voice_available, model_path=vosk_model_path if vosk_model_exists else None)
     
     # Add Vosk model download button if not already downloaded
     if not vosk_model_exists:
-        download_vosk_model()
+        st.warning("Vosk model not found. Please download the model to enable offline voice recognition.")
+        if st.button(t("download_vosk_model")):
+            from utils.voice_utils import download_vosk_model as dl_vosk_model
+            model_path = dl_vosk_model()
+            if model_path and os.path.exists(model_path):
+                st.success(f"Vosk model downloaded to {model_path}")
+                st.rerun()
+    
+    # Add a button to manually initialize voice processor
+    if not voice_available:
+        if st.button("Initialize Voice Recognition"):
+            try:
+                from utils.voice_utils import VoiceProcessor, TextToSpeech
+                # Check if Vosk model exists after potential download
+                vosk_model_exists = os.path.exists(vosk_model_path) and os.path.isdir(vosk_model_path) and len(os.listdir(vosk_model_path)) > 0
+                
+                if vosk_model_exists:
+                    st.session_state.voice_processor = VoiceProcessor(use_vosk=True, model_path=vosk_model_path)
+                    st.info(f"Voice processor initialized with Vosk model")
+                else:
+                    st.session_state.voice_processor = VoiceProcessor(use_vosk=False)
+                    st.info("Voice processor initialized with Whisper API (requires internet connection)")
+                
+                # Initialize text-to-speech engine
+                language = "ar" if st.session_state.language == "ar" else "en"
+                st.session_state.tts_engine = TextToSpeech(use_pyttsx3=True, language=language)
+                
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error initializing voice recognition: {e}")
     
     # About section
     st.markdown("---")

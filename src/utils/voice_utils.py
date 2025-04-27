@@ -58,6 +58,7 @@ class VoiceProcessor:
         self.audio_queue = queue.Queue()
         self.recording_thread = None
         self.sample_rate = 16000  # Default sample rate for Vosk
+        self.initialized = False
         
         # Check if required libraries are available
         if not SOUNDDEVICE_AVAILABLE:
@@ -70,15 +71,33 @@ class VoiceProcessor:
                 st.warning("Vosk library is required for offline voice recognition. Install it with 'pip install vosk'.")
                 return
             
-            if model_path and os.path.exists(model_path):
+            if model_path and os.path.exists(model_path) and os.path.isdir(model_path):
+                # Check if the model directory has content
+                if len(os.listdir(model_path)) == 0:
+                    st.warning(f"Vosk model directory exists but is empty: {model_path}")
+                    st.info("Please download a valid Vosk model using the download button.")
+                    return
+                    
                 try:
+                    st.info(f"Initializing Vosk model from {model_path}...")
                     self.vosk_model = Model(model_path)
                     self.recognizer = KaldiRecognizer(self.vosk_model, self.sample_rate)
+                    self.initialized = True
+                    st.success("Vosk model initialized successfully!")
                 except Exception as e:
-                    st.warning(f"Error initializing Vosk model: {e}")
+                    st.error(f"Error initializing Vosk model: {e}")
                     st.info("Please download a valid Vosk model using the download button.")
             else:
-                st.warning("Vosk model path not found. Please download a Vosk model using the download button.")
+                st.warning(f"Vosk model path not found or is not a directory: {model_path}")
+                st.info("Please download a valid Vosk model using the download button.")
+        else:
+            # Using Whisper API
+            try:
+                import openai
+                self.initialized = True
+                st.success("Voice processor initialized with Whisper API")
+            except ImportError:
+                st.error("OpenAI library is required for Whisper API. Install it with 'pip install openai'.")
     
     def _audio_callback(self, indata, frames, time, status):
         """Callback function for audio recording."""
@@ -89,6 +108,10 @@ class VoiceProcessor:
     
     def start_recording(self):
         """Start recording audio from the microphone."""
+        if not self.initialized:
+            st.error("Voice processor is not properly initialized. Please initialize it first.")
+            return
+            
         if self.recording:
             return
         
@@ -117,6 +140,10 @@ class VoiceProcessor:
         Returns:
             The transcribed text
         """
+        if not self.initialized:
+            st.error("Voice processor is not properly initialized. Please initialize it first.")
+            return ""
+            
         if not self.recording:
             return ""
         
@@ -139,11 +166,17 @@ class VoiceProcessor:
         Returns:
             The transcribed text
         """
-        if not self.recognizer:
+        if not self.initialized or not self.recognizer:
+            st.error("Vosk recognizer not initialized. Please initialize the voice processor first.")
             return "Error: Vosk recognizer not initialized"
         
         # Reset the recognizer
         self.recognizer.Reset()
+        
+        # Check if we have any audio data
+        if self.audio_queue.empty():
+            st.warning("No audio data recorded. Please try speaking louder or check your microphone.")
+            return ""
         
         # Process all audio chunks
         while not self.audio_queue.empty():
@@ -155,8 +188,12 @@ class VoiceProcessor:
         result_json = self.recognizer.FinalResult()
         try:
             result = json.loads(result_json)
-            return result.get("text", "")
+            text = result.get("text", "")
+            if not text:
+                st.warning("No speech detected. Please try speaking louder or check your microphone.")
+            return text
         except json.JSONDecodeError:
+            st.error("Error processing audio data.")
             return "Error processing audio"
     
     def _process_with_whisper(self) -> str:
