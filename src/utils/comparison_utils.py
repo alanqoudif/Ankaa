@@ -13,25 +13,37 @@ from langchain.chains import LLMChain
 class DocumentComparator:
     """Class for comparing legal documents and extracting relevant information."""
     
-    def __init__(self, retriever, llm, language: str = "en"):
+    def __init__(self, retriever, llm_or_chain, language: str = "en"):
         """
         Initialize the document comparator.
         
         Args:
             retriever: Document retriever for fetching relevant documents
-            llm: Language model for generating comparisons
+            llm_or_chain: Language model or QA chain for generating comparisons
             language: Language for the comparison (en or ar)
         """
+        import streamlit as st
+        from llm_chain import LegalQAChain
+        
         self.retriever = retriever
-        self.llm = llm
         self.language = language
         self.initialized = False
         
-        # Check if LLM is available
-        if self.llm is None:
-            import streamlit as st
-            st.error("LLM is not available for document comparison. Please initialize the system with a valid model.")
-            return
+        # Check if we received a LegalQAChain or an LLM
+        if isinstance(llm_or_chain, LegalQAChain):
+            # If it's a LegalQAChain, we'll use it directly for text generation
+            self.qa_chain = llm_or_chain
+            self.llm = None  # We don't need a separate LLM
+            st.info("Using LegalQAChain for document comparison")
+        else:
+            # If it's an LLM, we'll use it to create our chains
+            self.llm = llm_or_chain
+            self.qa_chain = None
+            
+            # Check if LLM is available
+            if self.llm is None:
+                st.error("LLM is not available for document comparison. Please initialize the system with a valid model.")
+                return
         
         try:
             # Initialize the comparison chain
@@ -41,16 +53,16 @@ class DocumentComparator:
             self.summarization_chain = self._create_summarization_chain()
             
             self.initialized = True
+            st.success("Document comparison initialized successfully")
         except Exception as e:
-            import streamlit as st
             st.error(f"Error initializing document comparison: {e}")
     
-    def _create_comparison_chain(self) -> LLMChain:
+    def _create_comparison_chain(self):
         """
         Create a chain for identifying laws to compare.
         
         Returns:
-            LLMChain for comparison
+            Chain for comparison (either LLMChain or a wrapper around LegalQAChain)
         """
         # Define the prompt template based on language
         if self.language == "ar":
@@ -81,14 +93,32 @@ class DocumentComparator:
             template=template
         )
         
-        return LLMChain(llm=self.llm, prompt=prompt)
+        if self.llm is not None:
+            # If we have an LLM, create a standard LLMChain
+            from langchain.chains import LLMChain
+            return LLMChain(llm=self.llm, prompt=prompt)
+        else:
+            # If we're using a LegalQAChain, create a wrapper
+            class QAChainWrapper:
+                def __init__(self, qa_chain, prompt):
+                    self.qa_chain = qa_chain
+                    self.prompt = prompt
+                
+                def run(self, **kwargs):
+                    # Format the prompt
+                    formatted_prompt = self.prompt.format(**kwargs)
+                    # Use the QA chain to generate a response
+                    # We'll use an empty context since we're just asking a question
+                    return self.qa_chain.answer_question(formatted_prompt, context="")
+            
+            return QAChainWrapper(self.qa_chain, prompt)
     
-    def _create_summarization_chain(self) -> LLMChain:
+    def _create_summarization_chain(self):
         """
         Create a chain for summarizing law content.
         
         Returns:
-            LLMChain for summarization
+            Chain for summarization (either LLMChain or a wrapper around LegalQAChain)
         """
         # Define the prompt template based on language
         if self.language == "ar":
@@ -125,7 +155,28 @@ class DocumentComparator:
             template=template
         )
         
-        return LLMChain(llm=self.llm, prompt=prompt)
+        if self.llm is not None:
+            # If we have an LLM, create a standard LLMChain
+            from langchain.chains import LLMChain
+            return LLMChain(llm=self.llm, prompt=prompt)
+        else:
+            # If we're using a LegalQAChain, create a wrapper
+            class QAChainWrapper:
+                def __init__(self, qa_chain, prompt):
+                    self.qa_chain = qa_chain
+                    self.prompt = prompt
+                
+                def run(self, **kwargs):
+                    # Format the prompt
+                    formatted_prompt = self.prompt.format(**kwargs)
+                    # Use the QA chain to generate a response
+                    # We'll use the content as context since we're summarizing
+                    return self.qa_chain.answer_question(
+                        question=f"Summarize the key points about {kwargs.get('topic')} in {kwargs.get('law_name')}",
+                        context=kwargs.get('content', '')
+                    )
+            
+            return QAChainWrapper(self.qa_chain, prompt)
     
     def _extract_laws_and_topic(self, query: str) -> Tuple[List[str], str]:
         """
