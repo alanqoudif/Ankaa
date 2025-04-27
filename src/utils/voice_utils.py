@@ -15,23 +15,50 @@ import streamlit as st
 
 # Optional imports that will be checked at runtime
 try:
-    import sounddevice as sd
-    import soundfile as sf
-    SOUNDDEVICE_AVAILABLE = True
-except ImportError:
-    SOUNDDEVICE_AVAILABLE = False
-
-try:
-    from vosk import Model, KaldiRecognizer
-    VOSK_AVAILABLE = True
-except ImportError:
-    VOSK_AVAILABLE = False
-
-try:
-    import pyttsx3
-    PYTTSX3_AVAILABLE = True
-except ImportError:
-    PYTTSX3_AVAILABLE = False
+    import sys
+    import importlib
+    import subprocess
+    import os
+    
+    # Try to import sounddevice
+    try:
+        import sounddevice as sd
+        SOUNDDEVICE_AVAILABLE = True
+    except ImportError:
+        # Try to install it if not available
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "sounddevice"])
+            importlib.invalidate_caches()
+            import sounddevice as sd
+            SOUNDDEVICE_AVAILABLE = True
+        except Exception as e:
+            print(f"Error installing sounddevice: {e}")
+            SOUNDDEVICE_AVAILABLE = False
+    
+    # Try to import vosk
+    try:
+        from vosk import Model, KaldiRecognizer
+        VOSK_AVAILABLE = True
+    except ImportError:
+        VOSK_AVAILABLE = False
+    
+    # Try to import pyttsx3
+    try:
+        import pyttsx3
+        PYTTSX3_AVAILABLE = True
+    except ImportError:
+        # Try to install it if not available
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "pyttsx3"])
+            importlib.invalidate_caches()
+            import pyttsx3
+            PYTTSX3_AVAILABLE = True
+        except Exception as e:
+            print(f"Error installing pyttsx3: {e}")
+            PYTTSX3_AVAILABLE = False
+            
+except Exception as e:
+    print(f"Error during library detection: {e}")
 
 try:
     from gtts import gTTS
@@ -60,6 +87,9 @@ class VoiceProcessor:
         self.sample_rate = 16000  # Default sample rate for Vosk
         self.initialized = False
         self.init_error = None
+        
+        # Force reload of the libraries to ensure they're properly detected
+        self._reload_libraries()
         
         # Check if required libraries are available
         if not SOUNDDEVICE_AVAILABLE:
@@ -112,6 +142,44 @@ class VoiceProcessor:
             except ImportError:
                 self.init_error = "OpenAI library is required for Whisper API. Install it with 'pip install openai'."
                 st.error(self.init_error)
+    
+    def _reload_libraries(self):
+        """Force reload of required libraries to ensure they're properly detected."""
+        global SOUNDDEVICE_AVAILABLE, VOSK_AVAILABLE, PYTTSX3_AVAILABLE
+        
+        try:
+            import sys
+            import importlib
+            
+            # Try to import sounddevice
+            try:
+                if 'sounddevice' in sys.modules:
+                    importlib.reload(sys.modules['sounddevice'])
+                import sounddevice as sd
+                SOUNDDEVICE_AVAILABLE = True
+            except ImportError:
+                SOUNDDEVICE_AVAILABLE = False
+            
+            # Try to import vosk
+            try:
+                if 'vosk' in sys.modules:
+                    importlib.reload(sys.modules['vosk'])
+                from vosk import Model, KaldiRecognizer
+                VOSK_AVAILABLE = True
+            except ImportError:
+                VOSK_AVAILABLE = False
+            
+            # Try to import pyttsx3
+            try:
+                if 'pyttsx3' in sys.modules:
+                    importlib.reload(sys.modules['pyttsx3'])
+                import pyttsx3
+                PYTTSX3_AVAILABLE = True
+            except ImportError:
+                PYTTSX3_AVAILABLE = False
+                
+        except Exception as e:
+            print(f"Error during library reload: {e}")
     
     def _audio_callback(self, indata, frames, time, status):
         """Callback function for audio recording."""
@@ -266,40 +334,78 @@ class TextToSpeech:
         Initialize the text-to-speech engine.
         
         Args:
-            use_pyttsx3: Whether to use pyttsx3 (offline) or gTTS (online)
-            language: Language code for speech synthesis
+            use_pyttsx3: Whether to use pyttsx3 for offline TTS
+            language: Language for TTS (en or ar)
         """
         self.use_pyttsx3 = use_pyttsx3
         self.language = language
         self.engine = None
         self.initialized = False
+        self.init_error = None
         
-        # Initialize the appropriate TTS engine
+        # Force reload of the libraries to ensure they're properly detected
+        self._reload_libraries()
+        
+        # Initialize pyttsx3 if selected
         if use_pyttsx3:
             if not PYTTSX3_AVAILABLE:
-                st.warning("pyttsx3 library is required for offline TTS. Install it with 'pip install pyttsx3'.")
-                # Fall back to gTTS if pyttsx3 is not available
-                self.use_pyttsx3 = False
-                if GTTS_AVAILABLE:
-                    st.info("Falling back to gTTS for online text-to-speech.")
-                    self.initialized = True
+                self.init_error = "pyttsx3 library is required for offline TTS. Install it with 'pip install pyttsx3'."
+                st.warning(self.init_error)
                 return
             
             try:
                 self.engine = pyttsx3.init()
+                
+                # Set language properties
+                if language == "ar":
+                    # Try to find an Arabic voice
+                    voices = self.engine.getProperty('voices')
+                    for voice in voices:
+                        if "arabic" in voice.name.lower():
+                            self.engine.setProperty('voice', voice.id)
+                            break
+                
                 self.initialized = True
+                st.success("Text-to-speech engine initialized successfully!")
             except Exception as e:
-                st.error(f"Error initializing pyttsx3: {e}")
-                # Fall back to gTTS if pyttsx3 initialization fails
-                self.use_pyttsx3 = False
-                if GTTS_AVAILABLE:
-                    st.info("Falling back to gTTS for online text-to-speech.")
-                    self.initialized = True
+                self.init_error = f"Error initializing pyttsx3: {e}"
+                st.error(self.init_error)
         else:
+            # Using gTTS (requires internet)
             if not GTTS_AVAILABLE:
                 st.warning("gTTS library is required for online TTS. Install it with 'pip install gtts'.")
                 return
             self.initialized = True
+            st.success("Text-to-speech engine initialized with gTTS (requires internet)")
+    
+    def _reload_libraries(self):
+        """Force reload of required libraries to ensure they're properly detected."""
+        global PYTTSX3_AVAILABLE, GTTS_AVAILABLE
+        
+        try:
+            import sys
+            import importlib
+            
+            # Try to import pyttsx3
+            try:
+                if 'pyttsx3' in sys.modules:
+                    importlib.reload(sys.modules['pyttsx3'])
+                import pyttsx3
+                PYTTSX3_AVAILABLE = True
+            except ImportError:
+                PYTTSX3_AVAILABLE = False
+            
+            # Try to import gtts
+            try:
+                if 'gtts' in sys.modules:
+                    importlib.reload(sys.modules['gtts'])
+                from gtts import gTTS
+                GTTS_AVAILABLE = True
+            except ImportError:
+                GTTS_AVAILABLE = False
+                
+        except Exception as e:
+            print(f"Error during library reload: {e}")
     
     def speak(self, text: str) -> str:
         """
