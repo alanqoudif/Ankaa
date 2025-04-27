@@ -24,10 +24,19 @@ from ui.voice_components import (
     render_voice_status,
     download_vosk_model
 )
+from ui.document_components import (
+    render_document_generation_section,
+    render_download_section,
+    render_document_preview,
+    render_image_preview,
+    collect_form_data
+)
 from utils.model_utils import check_model_availability, get_recommended_models
 from utils.ollama_utils import list_ollama_models, is_ollama_running
 from utils.voice_utils import VoiceProcessor, TextToSpeech
 from utils.comparison_utils import DocumentComparator
+from utils.document_generation_utils import DocumentGenerator, extract_document_content_from_query
+from utils.image_generation_utils import ImageGenerator
 
 # Dictionary for translations
 TRANSLATIONS = {
@@ -78,7 +87,50 @@ TRANSLATIONS = {
         "read_aloud": "Read Aloud",
         "comparison_results": "Comparison Results",
         "laws_compared": "Laws Compared",
-        "comparison_topic": "Comparison Topic"
+        "comparison_topic": "Comparison Topic",
+        
+        "document_generation_title": "Document Generation",
+        "document_generation_description": "Generate legal documents based on your requirements",
+        "document_type": "Document Type",
+        "document_type_contract": "Contract",
+        "document_type_authorization": "Authorization",
+        "contract_type": "Contract Type",
+        "contract_type_employment": "Employment Contract",
+        "contract_type_rental": "Rental Contract",
+        "contract_type_service": "Service Contract",
+        "first_party": "First Party",
+        "second_party": "Second Party",
+        "default_first_party": "Employer",
+        "default_second_party": "Employee",
+        "position": "Position",
+        "default_position": "Engineer",
+        "salary": "Salary (OMR)",
+        "duration": "Duration",
+        "default_duration": "2 years",
+        "start_date": "Start Date",
+        "property_description": "Property Description",
+        "rent_amount": "Rent Amount (OMR)",
+        "service_description": "Service Description",
+        "fee_amount": "Fee Amount (OMR)",
+        "authorizer": "Authorizer",
+        "authorized": "Authorized Person",
+        "default_authorizer": "Authorizer Name",
+        "default_authorized": "Authorized Person Name",
+        "purpose": "Purpose",
+        "default_purpose": "To represent me in all legal matters",
+        "end_date": "End Date",
+        "generate_document_button": "Generate Document",
+        "download_generated_files": "Download Generated Files",
+        "download_pdf": "Download PDF",
+        "download_image": "Download Image",
+        "download_zip": "Download Package",
+        "preview_pdf": "Preview PDF",
+        "preview_image": "Preview Image",
+        "pdf_preview": "PDF Preview",
+        "image_preview": "Image Preview",
+        "document_preview": "Document Preview",
+        "generating_document": "Generating document...",
+        "document_generated": "Document generated successfully!"
     },
     "ar": {
         "app_title": "المساعد القانوني الذكي لسلطنة عمان",
@@ -127,7 +179,50 @@ TRANSLATIONS = {
         "read_aloud": "قراءة بصوت عالٍ",
         "comparison_results": "نتائج المقارنة",
         "laws_compared": "القوانين التي تمت مقارنتها",
-        "comparison_topic": "موضوع المقارنة"
+        "comparison_topic": "موضوع المقارنة",
+        
+        "document_generation_title": "إنشاء المستندات",
+        "document_generation_description": "إنشاء مستندات قانونية بناءً على متطلباتك",
+        "document_type": "نوع المستند",
+        "document_type_contract": "عقد",
+        "document_type_authorization": "تفويض",
+        "contract_type": "نوع العقد",
+        "contract_type_employment": "عقد عمل",
+        "contract_type_rental": "عقد إيجار",
+        "contract_type_service": "عقد خدمة",
+        "first_party": "الطرف الأول",
+        "second_party": "الطرف الثاني",
+        "default_first_party": "صاحب العمل",
+        "default_second_party": "الموظف",
+        "position": "المنصب",
+        "default_position": "مهندس",
+        "salary": "الراتب (ريال عماني)",
+        "duration": "المدة",
+        "default_duration": "سنتين",
+        "start_date": "تاريخ البدء",
+        "property_description": "وصف العقار",
+        "rent_amount": "مبلغ الإيجار (ريال عماني)",
+        "service_description": "وصف الخدمة",
+        "fee_amount": "مبلغ الرسوم (ريال عماني)",
+        "authorizer": "المفوض",
+        "authorized": "الشخص المفوض إليه",
+        "default_authorizer": "اسم المفوض",
+        "default_authorized": "اسم الشخص المفوض إليه",
+        "purpose": "الغرض",
+        "default_purpose": "تمثيلي في جميع الأمور القانونية",
+        "end_date": "تاريخ الانتهاء",
+        "generate_document_button": "إنشاء المستند",
+        "download_generated_files": "تحميل الملفات المنشأة",
+        "download_pdf": "تحميل PDF",
+        "download_image": "تحميل الصورة",
+        "download_zip": "تحميل الحزمة",
+        "preview_pdf": "معاينة PDF",
+        "preview_image": "معاينة الصورة",
+        "pdf_preview": "معاينة PDF",
+        "image_preview": "معاينة الصورة",
+        "document_preview": "معاينة المستند",
+        "generating_document": "جاري إنشاء المستند...",
+        "document_generated": "تم إنشاء المستند بنجاح!"
     }
 }
 
@@ -184,6 +279,18 @@ if "document_comparator" not in st.session_state:
     st.session_state.document_comparator = None
 if "is_recording" not in st.session_state:
     st.session_state.is_recording = False
+if "document_generator" not in st.session_state:
+    st.session_state.document_generator = None
+if "image_generator" not in st.session_state:
+    st.session_state.image_generator = None
+if "generated_pdf" not in st.session_state:
+    st.session_state.generated_pdf = None
+if "generated_image" not in st.session_state:
+    st.session_state.generated_image = None
+if "generated_zip" not in st.session_state:
+    st.session_state.generated_zip = None
+if "document_type" not in st.session_state:
+    st.session_state.document_type = None
 
 # Render header
 render_header()
@@ -682,14 +789,18 @@ if prompt := st.chat_input(t("ask_placeholder")):
     st.session_state.messages.append({"role": "user", "content": prompt})
     
     # Display user message
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    render_chat_message("user", prompt)
+    
+    # Check if this is a document generation request
+    document_generated = False
+    if st.session_state.initialized and any(word in prompt.lower() for word in ["عقد", "contract", "تفويض", "authorization", "مستند", "document", "شهادة", "certificate"]):
+        document_generated = generate_document_from_chat(prompt)
     
     # Generate response
     if not st.session_state.initialized:
         response = "The system has not been initialized yet. Please load documents, create embeddings, and initialize the system using the sidebar controls."
         sources = []
-    else:
+    elif not document_generated:
         # Check if this is a comparison query
         if ("compare" in prompt.lower() or "قارن" in prompt or "مقارنة" in prompt) and st.session_state.document_comparator:
             with st.spinner(t("processing")):
@@ -824,6 +935,27 @@ if prompt := st.chat_input(t("ask_placeholder")):
                             "metadata": doc.metadata
                         })
     
+    # If a document was generated, add information about it to the response
+    if document_generated:
+        doc_type = st.session_state.document_type
+        doc_type_display = t(f"document_type_{doc_type}") if doc_type else t("document")
+        
+        # Create response about the generated document
+        response = f"{t('document_generated')}\n\n{t('download_generated_files')}:"
+        
+        # Add download section for the generated files
+        render_download_section(
+            st.session_state.generated_pdf,
+            st.session_state.generated_image,
+            st.session_state.generated_zip,
+            st.session_state.document_type,
+            t
+        )
+        
+        # Show preview of the image
+        if st.session_state.generated_image:
+            render_image_preview(st.session_state.generated_image, doc_type_display, t)
+    
     # Add assistant response to chat history with sources
     message = {
         "role": "assistant", 
@@ -852,6 +984,106 @@ if prompt := st.chat_input(t("ask_placeholder")):
                 current_time = str(int(time.time()))
                 unique_key = f"current_source_{i}_{hash(current_time)}_{hash(source.get('source', ''))}"  
                 st.text_area(f"{t('content')} {i+1}", source["content"], height=150, key=unique_key)
+
+# Function to generate documents based on user input
+def generate_document(doc_type: str):
+    """
+    Generate a document and image based on the form data.
+    
+    Args:
+        doc_type: Type of document to generate
+    """
+    with st.spinner(t("generating_document")):
+        # Initialize generators if not already initialized
+        if not st.session_state.document_generator:
+            st.session_state.document_generator = DocumentGenerator()
+        if not st.session_state.image_generator:
+            st.session_state.image_generator = ImageGenerator()
+        
+        # Collect form data
+        content = {}
+        
+        # Get form values from session state
+        for key in st.session_state:
+            if key.startswith('form_'):
+                # Extract the actual field name by removing the 'form_' prefix
+                field_name = key[5:]
+                content[field_name] = st.session_state[key]
+        
+        # Set document type and title
+        if doc_type == "contract":
+            content["title"] = t("document_type_contract")
+            if "contract_type" in content:
+                contract_type = content["contract_type"]
+                content["title"] = t(f"contract_type_{contract_type}")
+        elif doc_type == "authorization":
+            content["title"] = t("document_type_authorization")
+        
+        # Generate document package
+        pdf_bytes, image_bytes, zip_bytes = st.session_state.document_generator.create_document_package(doc_type, content)
+        
+        # Store generated files in session state
+        st.session_state.generated_pdf = pdf_bytes
+        st.session_state.generated_image = image_bytes
+        st.session_state.generated_zip = zip_bytes
+        st.session_state.document_type = doc_type
+        
+        # Show success message
+        st.success(t("document_generated"))
+
+# Function to extract document content from chat message
+def generate_document_from_chat(message: str):
+    """
+    Generate a document based on a chat message.
+    
+    Args:
+        message: User chat message
+    
+    Returns:
+        True if a document was generated, False otherwise
+    """
+    # Check if the message contains a document generation request
+    doc_indicators = ["عقد", "contract", "تفويض", "authorization", "مستند", "document", "شهادة", "certificate"]
+    
+    if any(indicator in message.lower() for indicator in doc_indicators):
+        # Initialize generators if not already initialized
+        if not st.session_state.document_generator:
+            st.session_state.document_generator = DocumentGenerator()
+        if not st.session_state.image_generator:
+            st.session_state.image_generator = ImageGenerator()
+        
+        # Extract document type and content from message
+        doc_type, content = extract_document_content_from_query(message)
+        
+        # Generate document package
+        with st.spinner(t("generating_document")):
+            pdf_bytes, image_bytes, zip_bytes = st.session_state.document_generator.create_document_package(doc_type, content)
+            
+            # Store generated files in session state
+            st.session_state.generated_pdf = pdf_bytes
+            st.session_state.generated_image = image_bytes
+            st.session_state.generated_zip = zip_bytes
+            st.session_state.document_type = doc_type
+            
+            return True
+    
+    return False
+
+# Document Generation Tab
+st.markdown(f"## {t('document_generation_title')}")
+
+# Document generation form
+render_document_generation_section(generate_document, t)
+
+# Display download section if documents have been generated
+if st.session_state.generated_pdf or st.session_state.generated_image or st.session_state.generated_zip:
+    render_download_section(
+        st.session_state.generated_pdf,
+        st.session_state.generated_image,
+        st.session_state.generated_zip,
+        st.session_state.document_type,
+        t
+    )
 
 # Instructions for first-time users
 if not st.session_state.get("messages", []):
