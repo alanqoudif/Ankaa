@@ -9,7 +9,7 @@ import os
 import pickle
 import gc
 import time
-import torch
+import numpy as np
 from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
@@ -17,6 +17,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 try:
     from langchain_community.vectorstores import Chroma
     from langchain_community.embeddings import HuggingFaceEmbeddings
+    from langchain_community.embeddings import FastEmbedEmbeddings
 except ImportError:
     # Fallback to old imports if new ones are not available
     from langchain.vectorstores import Chroma
@@ -25,30 +26,29 @@ except ImportError:
 class DocumentEmbedder:
     """Generates and stores embeddings for legal document chunks."""
     
-    def __init__(
-        self, 
-        persist_directory: str = "chroma_db",
-        embedding_model_name: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-    ):
+    def __init__(self, persist_directory: str = "chroma_db"):
         """
-        Initialize the document embedder.
+        Initialize the DocumentEmbedder.
         
         Args:
-            persist_directory: Directory to persist the vector database
-            embedding_model_name: Name of the embedding model to use
+            persist_directory: Directory to persist the vector store
         """
         self.persist_directory = persist_directory
-        self.embedding_model_name = embedding_model_name
+        os.makedirs(persist_directory, exist_ok=True)
         
-        # Create embeddings model - using a multilingual model to support both Arabic and English
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name=embedding_model_name,
-            model_kwargs={"device": "cpu"},
-            encode_kwargs={"normalize_embeddings": True}
-        )
+        # Initialize embeddings model - use a lighter model to avoid memory issues
+        try:
+            # Try to use FastEmbedEmbeddings which is more memory efficient
+            self.embeddings = FastEmbedEmbeddings()
+        except (ImportError, Exception):
+            # Fallback to HuggingFaceEmbeddings with minimal settings
+            self.embeddings = HuggingFaceEmbeddings(
+                model_name="sentence-transformers/all-MiniLM-L6-v2",
+                model_kwargs={'device': 'cpu'}
+            )
         
-        # Initialize vector store if it exists
-        if os.path.exists(persist_directory):
+        # Try to load existing vector store if it exists
+        if os.path.exists(os.path.join(persist_directory, "chroma.sqlite3")):
             self.vector_store = Chroma(
                 persist_directory=persist_directory,
                 embedding_function=self.embeddings
@@ -63,18 +63,8 @@ class DocumentEmbedder:
         Args:
             documents: List of Document objects to create embeddings for
         """
-        # Clear GPU memory if available
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        
         # Force garbage collection to free memory
         gc.collect()
-        
-        # Initialize embeddings model with optimized settings
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2",
-            model_kwargs={'device': 'cpu'}
-        )
         
         # Create vector store
         self.vector_store = Chroma(
@@ -83,9 +73,9 @@ class DocumentEmbedder:
             persist_directory=self.persist_directory
         )
         
-        # Process documents in smaller batches to avoid memory issues
+        # Process documents in very small batches to avoid memory issues
         print(f"Creating embeddings for {len(documents)} documents...")
-        batch_size = 500  # Adjust based on available memory
+        batch_size = 100  # Smaller batch size to avoid memory issues
         total_batches = (len(documents) + batch_size - 1) // batch_size
         
         for i in range(0, len(documents), batch_size):
@@ -101,8 +91,6 @@ class DocumentEmbedder:
             
             # Free memory
             gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
             
             # Small delay to allow system to stabilize
             time.sleep(1)
