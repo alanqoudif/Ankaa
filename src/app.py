@@ -58,7 +58,12 @@ TRANSLATIONS = {
         "welcome_step4": "4. Or simply click 'Setup All' to do all three steps at once",
         "welcome_step5": "5. Ask your questions in the chat box below",
         "ollama_not_running": "Ollama is not running. Please start Ollama to use Ollama models.",
-        "no_ollama_models": "No Ollama models found. Please pull at least one model using 'ollama pull <model_name>'."
+        "no_ollama_models": "No Ollama models found. Please pull at least one model using 'ollama pull <model_name>'.",
+        "article_not_found": "I couldn't find Article {article_number} in the legal documents. Please check the article number and try again.",
+        "section_not_found": "I couldn't find Section {section_number} in the legal documents. Please check the section number and try again.",
+        "summarizing": "Summarizing the content...",
+        "summary_title": "Summary of {item_type} {item_number}",
+        "from_law": "from {law_name}"
     },
     "ar": {
         "app_title": "المساعد القانوني الذكي لسلطنة عمان",
@@ -95,7 +100,12 @@ TRANSLATIONS = {
         "welcome_step4": "4. أو ببساطة انقر على 'إعداد الكل' للقيام بالخطوات الثلاث دفعة واحدة",
         "welcome_step5": "5. اطرح أسئلتك في مربع الدردشة أدناه",
         "ollama_not_running": "أولاما غير مشغل. يرجى تشغيل أولاما لاستخدام نماذج أولاما.",
-        "no_ollama_models": "لم يتم العثور على نماذج أولاما. يرجى سحب نموذج واحد على الأقل باستخدام 'ollama pull <اسم_النموذج>'."
+        "no_ollama_models": "لم يتم العثور على نماذج أولاما. يرجى سحب نموذج واحد على الأقل باستخدام 'ollama pull <اسم_النموذج>'.",
+        "article_not_found": "لم أتمكن من العثور على المادة {article_number} في المستندات القانونية. يرجى التحقق من رقم المادة والمحاولة مرة أخرى.",
+        "section_not_found": "لم أتمكن من العثور على القسم {section_number} في المستندات القانونية. يرجى التحقق من رقم القسم والمحاولة مرة أخرى.",
+        "summarizing": "جاري تلخيص المحتوى...",
+        "summary_title": "ملخص {item_type} {item_number}",
+        "from_law": "من {law_name}"
     }
 }
 
@@ -454,45 +464,119 @@ if prompt := st.chat_input(t("ask_placeholder")):
         response = "The system has not been initialized yet. Please load documents, create embeddings, and initialize the system using the sidebar controls."
         sources = []
     else:
-        with st.spinner(t("searching")):
-            # Retrieve relevant documents with higher k to ensure we get enough relevant content
-            documents = st.session_state.retriever.retrieve(prompt, k=top_k * 2)
-            
-            # Filter documents more precisely to find the most relevant ones for this specific query
-            # This helps ensure we're reading files that are directly related to the user's question
-            filtered_documents = []
-            for doc in documents:
-                # Simple relevance check - can be enhanced with more sophisticated methods
-                if any(term.lower() in doc.page_content.lower() for term in prompt.lower().split()):
-                    filtered_documents.append(doc)
-            
-            # Use at least top_k documents, even if filtering removed some
-            if len(filtered_documents) < top_k and len(documents) >= top_k:
-                filtered_documents = documents[:top_k]
-            
-            # Prepare context for the LLM using the filtered documents
-            context = ""
-            for doc in filtered_documents:
-                source = doc.metadata.get("source", "Unknown source")
-                if "/" in source:
-                    source = source.split("/")[-1]
-                context += f"\nSource: {source}\n{doc.page_content}\n\n"
-            
-            # Generate answer
-            response = st.session_state.qa_chain.answer_question(prompt, context)
-            
-            # Prepare sources for display
-            sources = []
-            for i, doc in enumerate(documents):
-                source = doc.metadata.get("source", "Unknown source")
-                # Extract just the filename from the path
-                if "/" in source:
-                    source = source.split("/")[-1]
+        # Check if this is a request for a specific article or section
+        doc, item_type, found = st.session_state.retriever.get_article_or_section(prompt)
+        
+        # If it's a request for a specific article or section
+        if item_type in ["article", "section"]:
+            if found:
+                # Get the item number and law name
+                item_number = doc.metadata.get(f"{item_type}_id", "")
+                law_name = doc.metadata.get("law_name", doc.metadata.get("filename", ""))
                 
-                sources.append({
-                    "source": source,
-                    "content": doc.page_content
-                })
+                # Check if this is a summarization request
+                is_summary_request = "summarize" in prompt.lower() or "تلخيص" in prompt or "لخص" in prompt
+                
+                if is_summary_request:
+                    with st.spinner(t("summarizing")):
+                        # Generate summary
+                        summary = st.session_state.qa_chain.summarize_text(doc.page_content)
+                        
+                        # Format the response
+                        item_type_display = "Article" if item_type == "article" else "Section"
+                        if st.session_state.language == "ar":
+                            item_type_display = "المادة" if item_type == "article" else "القسم"
+                        
+                        title = t("summary_title").format(item_type=item_type_display, item_number=item_number)
+                        if law_name:
+                            title += " " + t("from_law").format(law_name=law_name)
+                        
+                        response = f"**{title}**\n\n{summary}"
+                else:
+                    # Just return the content of the article/section
+                    item_type_display = "Article" if item_type == "article" else "Section"
+                    if st.session_state.language == "ar":
+                        item_type_display = "المادة" if item_type == "article" else "القسم"
+                    
+                    title = f"**{item_type_display} {item_number}**"
+                    if law_name:
+                        title += " " + t("from_law").format(law_name=law_name)
+                    
+                    response = f"{title}\n\n{doc.page_content}"
+                
+                # Add source information
+                sources = [{
+                    "source": doc.metadata.get("filename", doc.metadata.get("source", "Unknown")),
+                    "content": doc.page_content,
+                    "metadata": doc.metadata
+                }]
+            else:
+                # Article or section not found
+                if item_type == "article":
+                    # Extract article number from query
+                    import re
+                    article_match = re.search(r'article\s+(\d+)|المادة\s+(\d+)|مادة\s+(\d+)', prompt.lower())
+                    article_number = article_match.group(1) if article_match and article_match.group(1) else \
+                                    article_match.group(2) if article_match and article_match.group(2) else \
+                                    article_match.group(3) if article_match and article_match.group(3) else "?"
+                    
+                    response = t("article_not_found").format(article_number=article_number)
+                else:  # section
+                    # Extract section number from query
+                    import re
+                    section_match = re.search(r'section\s+(\d+)|chapter\s+(\d+)|القسم\s+(\d+)|الفصل\s+(\d+)|الباب\s+(\d+)', prompt.lower())
+                    section_number = section_match.group(1) if section_match and section_match.group(1) else \
+                                    section_match.group(2) if section_match and section_match.group(2) else \
+                                    section_match.group(3) if section_match and section_match.group(3) else \
+                                    section_match.group(4) if section_match and section_match.group(4) else \
+                                    section_match.group(5) if section_match and section_match.group(5) else "?"
+                    
+                    response = t("section_not_found").format(section_number=section_number)
+                
+                sources = []
+        else:
+            # Regular question answering
+            with st.spinner(t("searching")):
+                # Retrieve relevant documents with higher k to ensure we get enough relevant content
+                documents = st.session_state.retriever.retrieve(prompt, k=top_k * 2)
+                
+                # Filter documents more precisely to find the most relevant ones for this specific query
+                # This helps ensure we're reading files that are directly related to the user's question
+                filtered_documents = []
+                for doc in documents:
+                    # Simple relevance check - can be enhanced with more sophisticated methods
+                    if any(term.lower() in doc.page_content.lower() for term in prompt.lower().split()):
+                        filtered_documents.append(doc)
+                
+                # Use at least top_k documents, even if filtering removed some
+                if len(filtered_documents) < top_k and len(documents) >= top_k:
+                    filtered_documents = documents[:top_k]
+                
+                # Prepare context for the LLM using the filtered documents
+                context = ""
+                for doc in filtered_documents:
+                    source = doc.metadata.get("source", "Unknown source")
+                    if "/" in source:
+                        source = source.split("/")[-1]
+                    context += f"\nSource: {source}\n{doc.page_content}\n\n"
+                
+                # Generate answer
+                response = st.session_state.qa_chain.answer_question(prompt, context)
+                
+                # Prepare sources for display
+                sources = []
+                for i, doc in enumerate(documents):
+                    source = doc.metadata.get("source", "Unknown source")
+                    # Extract just the filename from the path
+                    if "/" in source:
+                        source = source.split("/")[-1]
+                    
+                    # Create source object
+                    sources.append({
+                        "source": source,
+                        "content": doc.page_content,
+                        "metadata": doc.metadata
+                    })
     
     # Add assistant response to chat history with sources
     message = {

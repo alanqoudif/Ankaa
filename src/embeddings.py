@@ -127,6 +127,35 @@ class DocumentEmbedder:
             raise ValueError("Vector store not initialized. Please create embeddings first.")
             
         return self.vector_store.similarity_search(query, k=k)
+    
+    def get_all_documents(self) -> List[Document]:
+        """
+        Get all documents stored in the vector store.
+        
+        Returns:
+            List of all Document objects in the vector store
+        """
+        if self.vector_store is None:
+            raise ValueError("Vector store not initialized. Please create embeddings first.")
+        
+        # Get all document IDs from the collection
+        collection = self.vector_store._collection
+        ids = collection.get()['ids']
+        
+        # Retrieve all documents
+        all_docs = []
+        for doc_id in ids:
+            # Get the document by ID
+            result = collection.get(ids=[doc_id])
+            if result and result['documents'] and result['metadatas']:
+                # Create Document object
+                doc = Document(
+                    page_content=result['documents'][0],
+                    metadata=result['metadatas'][0]
+                )
+                all_docs.append(doc)
+        
+        return all_docs
 
 
 if __name__ == "__main__":

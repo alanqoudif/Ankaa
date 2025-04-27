@@ -54,6 +54,20 @@ Do not make up or infer information that is not explicitly stated in the context
         
         self.qa_prompt_template = """\nContext:\n{context}\n\nQuestion:\n{question}\n\nAnswer:\n"""
         
+        # Summarization prompt template
+        self.summary_system_prompt = """You are a legal assistant specialized in summarizing Omani legal documents. Your task is to create a concise and accurate summary of the legal text provided.
+
+Follow these guidelines:
+1. Summarize the content in 3-5 lines only
+2. Focus on the key legal provisions and requirements
+3. Maintain the legal accuracy of the content
+4. Use clear and professional language
+5. Do not add any information not present in the original text
+
+Your summary should be brief but comprehensive enough to capture the essence of the legal text."""
+        
+        self.summary_prompt_template = """\nLegal Text to Summarize:\n{text}\n\nConcise Summary (3-5 lines only):\n"""
+        
         # Initialize LLM based on the chosen method
         if use_ollama:
             # Check if Ollama is running
@@ -127,6 +141,51 @@ Do not make up or infer information that is not explicitly stated in the context
                 return response.strip()
         except Exception as e:
             return f"An error occurred while processing your question: {str(e)}"
+    
+    def summarize_text(self, text: str) -> str:
+        """
+        Create a concise summary of the provided legal text.
+        
+        Args:
+            text: Legal text to summarize
+            
+        Returns:
+            Concise summary of the text (3-5 lines)
+        """
+        if self.model_type is None:
+            return "I apologize, but the AI model is not properly initialized. Please make sure the model file exists or Ollama is running and try again."
+        
+        try:
+            if self.model_type == "ollama":
+                # Use Ollama for inference
+                prompt = self.summary_prompt_template.format(text=text)
+                response = generate_ollama_completion(
+                    model_name=self.ollama_model,
+                    prompt=prompt,
+                    system_prompt=self.summary_system_prompt,
+                    temperature=self.temperature,
+                    max_tokens=500  # Limit tokens for summary
+                )
+                return response.strip()
+            else:
+                # Use local LLM for summarization
+                # Create a temporary prompt template for summarization
+                summary_prompt = PromptTemplate(
+                    input_variables=["text"],
+                    template=self.summary_system_prompt + self.summary_prompt_template
+                )
+                
+                # Create a temporary chain for summarization
+                summary_chain = LLMChain(
+                    llm=self.llm,
+                    prompt=summary_prompt,
+                    verbose=self.verbose
+                )
+                
+                response = summary_chain.run(text=text)
+                return response.strip()
+        except Exception as e:
+            return f"An error occurred while creating the summary: {str(e)}"
     
     def get_model_info(self) -> Dict[str, Any]:
         """
