@@ -18,6 +18,7 @@ from ui.components import (
     render_source_documents
 )
 from utils.model_utils import check_model_availability, get_recommended_models
+from utils.ollama_utils import list_ollama_models, is_ollama_running
 
 # Set page configuration
 st.set_page_config(
@@ -60,19 +61,48 @@ with st.sidebar:
     
     # Model selection
     st.markdown("### LLM Model")
-    models = get_recommended_models()
-    model_options = ["Custom Path"] + [model["name"] for model in models]
-    selected_model = st.selectbox("Select Model", model_options)
     
-    if selected_model == "Custom Path":
-        model_path = st.text_input("Model Path", value=DEFAULT_MODEL_PATH)
+    # Model source selection
+    model_source = st.radio(
+        "Model Source",
+        options=["Local Model", "Ollama"],
+        horizontal=True
+    )
+    
+    use_ollama = model_source == "Ollama"
+    
+    if use_ollama:
+        # Check if Ollama is running
+        if is_ollama_running():
+            # Get available Ollama models
+            ollama_models = list_ollama_models()
+            if ollama_models:
+                ollama_model_names = [model.get("name") for model in ollama_models]
+                selected_ollama_model = st.selectbox("Select Ollama Model", ollama_model_names)
+                model_path = "" # Not used with Ollama
+            else:
+                st.warning("No Ollama models found. Please pull some models using 'ollama pull <model_name>'")
+                selected_ollama_model = "llama2"
+                model_path = ""
+        else:
+            st.error("Ollama is not running. Please start Ollama and refresh this page.")
+            selected_ollama_model = "llama2"
+            model_path = ""
     else:
-        # Find the selected model in the list
-        selected_model_info = next((model for model in models if model["name"] == selected_model), None)
-        if selected_model_info:
-            model_path = selected_model_info["path"]
-            if not check_model_availability(model_path):
-                st.warning(f"Model not found at {model_path}. Please download it first.")
+        # Local model selection
+        models = get_recommended_models()
+        model_options = ["Custom Path"] + [model["name"] for model in models]
+        selected_model = st.selectbox("Select Model", model_options)
+        
+        if selected_model == "Custom Path":
+            model_path = st.text_input("Model Path", value=DEFAULT_MODEL_PATH)
+        else:
+            # Find the selected model in the list
+            selected_model_info = next((model for model in models if model["name"] == selected_model), None)
+            if selected_model_info:
+                model_path = selected_model_info["path"]
+                if not check_model_availability(model_path):
+                    st.warning(f"Model not found at {model_path}. Please download it first.")
     
     # Document processing options
     st.markdown("### Document Processing")
@@ -124,19 +154,32 @@ with st.sidebar:
     if st.button("Initialize System"):
         if not st.session_state.embeddings_created:
             st.error("Please load documents and create embeddings first.")
-        elif not os.path.exists(model_path):
+        elif not use_ollama and not os.path.exists(model_path):
             st.error(f"Model file not found at {model_path}. Please download the model or update the path.")
+        elif use_ollama and not is_ollama_running():
+            st.error("Ollama is not running. Please start Ollama and try again.")
         else:
             with st.spinner("Initializing system..."):
                 # Initialize retriever and QA chain
                 retriever = LegalDocumentRetriever(st.session_state.embedder, top_k=top_k)
-                qa_chain = LegalQAChain(model_path=model_path)
+                
+                if use_ollama:
+                    qa_chain = LegalQAChain(
+                        use_ollama=True,
+                        ollama_model=selected_ollama_model,
+                        temperature=0.1,
+                        max_tokens=max_tokens
+                    )
+                    model_name = f"Ollama: {selected_ollama_model}"
+                else:
+                    qa_chain = LegalQAChain(model_path=model_path)
+                    model_name = os.path.basename(model_path)
                 
                 st.session_state.retriever = retriever
                 st.session_state.qa_chain = qa_chain
                 st.session_state.initialized = True
                 st.session_state.model_loaded = True
-                st.session_state.model_name = os.path.basename(model_path)
+                st.session_state.model_name = model_name
                 st.success("System initialized successfully.")
     
     # System status
