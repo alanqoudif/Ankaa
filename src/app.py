@@ -18,8 +18,16 @@ from ui.components import (
     render_welcome_message,
     render_source_documents
 )
+from ui.voice_components import (
+    render_voice_input_button,
+    render_text_to_speech_button,
+    render_voice_status,
+    download_vosk_model
+)
 from utils.model_utils import check_model_availability, get_recommended_models
 from utils.ollama_utils import list_ollama_models, is_ollama_running
+from utils.voice_utils import VoiceProcessor, TextToSpeech
+from utils.comparison_utils import DocumentComparator
 
 # Dictionary for translations
 TRANSLATIONS = {
@@ -63,7 +71,14 @@ TRANSLATIONS = {
         "section_not_found": "I couldn't find Section {section_number} in the legal documents. Please check the section number and try again.",
         "summarizing": "Summarizing the content...",
         "summary_title": "Summary of {item_type} {item_number}",
-        "from_law": "from {law_name}"
+        "from_law": "from {law_name}",
+        "download_vosk_model": "Download Vosk Model for Offline Voice Recognition",
+        "voice_input": "Voice Input",
+        "processing_voice": "Processing your voice input...",
+        "read_aloud": "Read Aloud",
+        "comparison_results": "Comparison Results",
+        "laws_compared": "Laws Compared",
+        "comparison_topic": "Comparison Topic"
     },
     "ar": {
         "app_title": "المساعد القانوني الذكي لسلطنة عمان",
@@ -105,7 +120,14 @@ TRANSLATIONS = {
         "section_not_found": "لم أتمكن من العثور على القسم {section_number} في المستندات القانونية. يرجى التحقق من رقم القسم والمحاولة مرة أخرى.",
         "summarizing": "جاري تلخيص المحتوى...",
         "summary_title": "ملخص {item_type} {item_number}",
-        "from_law": "من {law_name}"
+        "from_law": "من {law_name}",
+        "download_vosk_model": "تحميل نموذج Vosk للتعرف على الصوت بدون إنترنت",
+        "voice_input": "إدخال صوتي",
+        "processing_voice": "جاري معالجة المدخلات الصوتية...",
+        "read_aloud": "قراءة بصوت عالٍ",
+        "comparison_results": "نتائج المقارنة",
+        "laws_compared": "القوانين التي تمت مقارنتها",
+        "comparison_topic": "موضوع المقارنة"
     }
 }
 
@@ -154,6 +176,14 @@ if "retriever" not in st.session_state:
     st.session_state.retriever = None
 if "qa_chain" not in st.session_state:
     st.session_state.qa_chain = None
+if "voice_processor" not in st.session_state:
+    st.session_state.voice_processor = None
+if "tts_engine" not in st.session_state:
+    st.session_state.tts_engine = None
+if "document_comparator" not in st.session_state:
+    st.session_state.document_comparator = None
+if "is_recording" not in st.session_state:
+    st.session_state.is_recording = False
 
 # Render header
 render_header()
@@ -334,6 +364,14 @@ with st.sidebar:
                     st.session_state.initialized = True
                     st.session_state.model_loaded = True
                     st.session_state.model_name = model_name
+                    
+                    # Initialize voice processor and text-to-speech engine
+                    st.session_state.voice_processor = VoiceProcessor()
+                    st.session_state.tts_engine = TextToSpeech()
+                    
+                    # Initialize document comparator
+                    st.session_state.document_comparator = DocumentComparator(st.session_state.embedder)
+                    
                     st.success(t("system_initialized"))
     
     # Setup All button (does all three steps)
@@ -414,21 +452,56 @@ with st.sidebar:
                 
                 # Create QA chain
                 if use_ollama:
-                    qa_chain = LegalQAChain(
-                        use_ollama=True,
-                        ollama_model=selected_ollama_model,
-                        temperature=0.1,
-                        max_tokens=2000
-                    )
-                    model_name = f"Ollama: {selected_ollama_model}"
+                    from llm_chain import create_ollama_chain
+                    qa_chain = create_ollama_chain(selected_ollama_model)
                 else:
-                    qa_chain = LegalQAChain(model_path=model_path)
-                    model_name = os.path.basename(model_path)
+                    from llm_chain import create_local_chain
+                    qa_chain = create_local_chain(model_path)
                 
                 st.session_state.qa_chain = qa_chain
-                st.session_state.initialized = True
                 st.session_state.model_loaded = True
-                st.session_state.model_name = model_name
+                st.session_state.model_name = selected_ollama_model if use_ollama else os.path.basename(model_path)
+                
+                # Initialize voice processor if dependencies are available
+                try:
+                    from utils.voice_utils import VoiceProcessor, TextToSpeech
+                    
+                    # Check for Vosk model
+                    vosk_model_path = os.path.join(MODEL_DIR, "vosk-model-small-en-us-0.15")
+                    use_vosk = os.path.exists(vosk_model_path) and os.path.isdir(vosk_model_path) and len(os.listdir(vosk_model_path)) > 0
+                    
+                    # Initialize voice processor
+                    if use_vosk:
+                        st.session_state.voice_processor = VoiceProcessor(use_vosk=True, model_path=vosk_model_path)
+                        st.info(f"Voice processor initialized with Vosk model at {vosk_model_path}")
+                    else:
+                        # Use Whisper API if Vosk model is not available
+                        st.session_state.voice_processor = VoiceProcessor(use_vosk=False)
+                        st.info("Voice processor initialized with Whisper API (requires internet connection)")
+                    
+                    # Initialize text-to-speech engine
+                    language = "ar" if st.session_state.language == "ar" else "en"
+                    st.session_state.tts_engine = TextToSpeech(use_pyttsx3=True, language=language)
+                    st.info("Text-to-speech engine initialized successfully")
+                    
+                except ImportError as e:
+                    st.warning(f"Voice processing not available: {e}")
+                    st.info("Install voice processing dependencies with: pip install vosk sounddevice soundfile pyttsx3 gtts")
+                except Exception as e:
+                    st.warning(f"Error initializing voice processing: {e}")
+                
+                # Initialize document comparator
+                try:
+                    from utils.comparison_utils import DocumentComparator
+                    st.session_state.document_comparator = DocumentComparator(
+                        retriever=st.session_state.retriever,
+                        llm=qa_chain.llm,
+                        language=st.session_state.language
+                    )
+                    st.info("Document comparison initialized successfully")
+                except Exception as e:
+                    st.warning(f"Error initializing document comparison: {e}")
+                
                 st.success(t("system_initialized"))
     
     # System status
@@ -443,6 +516,24 @@ with st.sidebar:
         "system_initialized": st.session_state.get("initialized", False)
     })
     
+    # Add voice status to the sidebar
+    # Check if voice processor is available
+    voice_available = st.session_state.get("voice_processor") is not None
+    
+    # Create models directory if it doesn't exist
+    os.makedirs(MODEL_DIR, exist_ok=True)
+    
+    # Check if Vosk model exists
+    vosk_model_path = os.path.join(MODEL_DIR, "vosk-model-small-en-us-0.15")
+    vosk_model_exists = os.path.exists(vosk_model_path)
+    
+    # Display voice recognition status
+    render_voice_status(is_available=voice_available, model_path=vosk_model_path if vosk_model_exists else None)
+    
+    # Add Vosk model download button if not already downloaded
+    if not vosk_model_exists:
+        download_vosk_model()
+    
     # About section
     st.markdown("---")
     st.markdown("### About")
@@ -451,6 +542,31 @@ with st.sidebar:
     
     This system does not use external knowledge and will only answer based on the documents it has been trained on.
     """)
+
+# Function to format comparison results
+def format_comparison_results(comparison_results):
+    """Format the results of a cross-document comparison into a readable response."""
+    response = f"## {t('comparison_results')}\n\n"
+    
+    # Add comparison topic if available
+    if comparison_results.get("comparison_topic"):
+        response += f"**{t('comparison_topic')}:** {comparison_results['comparison_topic']}\n\n"
+    
+    # Add laws compared
+    response += f"**{t('laws_compared')}:** {', '.join(comparison_results['laws_compared'])}\n\n"
+    
+    # Add results for each law
+    for law_name, law_data in comparison_results["results"].items():
+        response += f"### {law_name}\n\n"
+        
+        # Add key points from this law
+        if law_data.get("summary"):
+            for i, point in enumerate(law_data["summary"], 1):
+                response += f"{i}. {point}\n"
+        
+        response += "\n"
+    
+    return response
 
 # Main content area - Chat interface
 st.markdown(f"## {t('chat_interface')}")
@@ -469,6 +585,29 @@ for msg_idx, message in enumerate(st.session_state.messages):
                 unique_key = f"source_{msg_idx}_{i}_{hash(message.get('timestamp', ''))}_{hash(source.get('source', ''))}"  
                 st.text_area(f"{t('content')} {i+1}", source["content"], height=150, key=unique_key)
 
+# Add voice input button and download model button if system is initialized
+if st.session_state.initialized:
+    # Add a section for voice tools
+    st.markdown("### Voice Tools")
+    
+    # Check if Vosk model exists
+    vosk_model_path = os.path.join(MODEL_DIR, "vosk-model-small-en-us-0.15")
+    if not os.path.exists(vosk_model_path):
+        # Show download button for Vosk model
+        download_vosk_model()
+    
+    # Voice input callback function
+    def on_voice_input(text):
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": text})
+        st.rerun()
+    
+    # Show voice input button if voice processor is available
+    if st.session_state.voice_processor:
+        render_voice_input_button(on_voice_input)
+    else:
+        st.warning(t("Voice input is not available. Please install the required dependencies."))
+
 # Chat input
 if prompt := st.chat_input(t("ask_placeholder")):
     # Add user message to chat history
@@ -483,119 +622,139 @@ if prompt := st.chat_input(t("ask_placeholder")):
         response = "The system has not been initialized yet. Please load documents, create embeddings, and initialize the system using the sidebar controls."
         sources = []
     else:
+        # Check if this is a comparison query
+        if ("compare" in prompt.lower() or "قارن" in prompt or "مقارنة" in prompt) and st.session_state.document_comparator:
+            with st.spinner(t("processing")):
+                comparison_results = st.session_state.document_comparator.compare_laws(prompt)
+                
+                if comparison_results["success"]:
+                    # Format comparison results
+                    response = format_comparison_results(comparison_results)
+                    sources = []
+                    for law_name, law_data in comparison_results["results"].items():
+                        if law_data.get("documents"):
+                            for doc in law_data["documents"]:
+                                sources.append({
+                                    "source": f"{law_name} - {doc.metadata.get('source', '')}",
+                                    "content": doc.page_content
+                                })
+                else:
+                    response = comparison_results["message"]
+                    sources = []
         # Check if this is a request for a specific article or section
-        doc, item_type, found = st.session_state.retriever.get_article_or_section(prompt)
-        
-        # If it's a request for a specific article or section
-        if item_type in ["article", "section"]:
-            if found:
-                # Get the item number and law name
-                item_number = doc.metadata.get(f"{item_type}_id", "")
-                law_name = doc.metadata.get("law_name", doc.metadata.get("filename", ""))
-                
-                # Check if this is a summarization request
-                is_summary_request = "summarize" in prompt.lower() or "تلخيص" in prompt or "لخص" in prompt
-                
-                if is_summary_request:
-                    with st.spinner(t("summarizing")):
-                        # Generate summary
-                        summary = st.session_state.qa_chain.summarize_text(doc.page_content)
-                        
-                        # Format the response
+        else:
+            doc, item_type, found = st.session_state.retriever.get_article_or_section(prompt)
+            
+            # If it's a request for a specific article or section
+            if item_type in ["article", "section"]:
+                if found:
+                    # Get the item number and law name
+                    item_number = doc.metadata.get(f"{item_type}_id", "")
+                    law_name = doc.metadata.get("law_name", doc.metadata.get("filename", ""))
+                    
+                    # Check if this is a summarization request
+                    is_summary_request = "summarize" in prompt.lower() or "تلخيص" in prompt or "لخص" in prompt
+                    
+                    if is_summary_request:
+                        with st.spinner(t("summarizing")):
+                            # Generate summary
+                            summary = st.session_state.qa_chain.summarize_text(doc.page_content)
+                            
+                            # Format the response
+                            item_type_display = "Article" if item_type == "article" else "Section"
+                            if st.session_state.language == "ar":
+                                item_type_display = "المادة" if item_type == "article" else "القسم"
+                            
+                            title = t("summary_title").format(item_type=item_type_display, item_number=item_number)
+                            if law_name:
+                                title += " " + t("from_law").format(law_name=law_name)
+                            
+                            response = f"**{title}**\n\n{summary}"
+                    else:
+                        # Just return the content of the article/section
                         item_type_display = "Article" if item_type == "article" else "Section"
                         if st.session_state.language == "ar":
                             item_type_display = "المادة" if item_type == "article" else "القسم"
                         
-                        title = t("summary_title").format(item_type=item_type_display, item_number=item_number)
+                        title = f"**{item_type_display} {item_number}**"
                         if law_name:
                             title += " " + t("from_law").format(law_name=law_name)
                         
-                        response = f"**{title}**\n\n{summary}"
-                else:
-                    # Just return the content of the article/section
-                    item_type_display = "Article" if item_type == "article" else "Section"
-                    if st.session_state.language == "ar":
-                        item_type_display = "المادة" if item_type == "article" else "القسم"
+                        response = f"{title}\n\n{doc.page_content}"
                     
-                    title = f"**{item_type_display} {item_number}**"
-                    if law_name:
-                        title += " " + t("from_law").format(law_name=law_name)
-                    
-                    response = f"{title}\n\n{doc.page_content}"
-                
-                # Add source information
-                sources = [{
-                    "source": doc.metadata.get("filename", doc.metadata.get("source", "Unknown")),
-                    "content": doc.page_content,
-                    "metadata": doc.metadata
-                }]
-            else:
-                # Article or section not found
-                if item_type == "article":
-                    # Extract article number from query
-                    import re
-                    article_match = re.search(r'article\s+(\d+)|المادة\s+(\d+)|مادة\s+(\d+)', prompt.lower())
-                    article_number = article_match.group(1) if article_match and article_match.group(1) else \
-                                    article_match.group(2) if article_match and article_match.group(2) else \
-                                    article_match.group(3) if article_match and article_match.group(3) else "?"
-                    
-                    response = t("article_not_found").format(article_number=article_number)
-                else:  # section
-                    # Extract section number from query
-                    import re
-                    section_match = re.search(r'section\s+(\d+)|chapter\s+(\d+)|القسم\s+(\d+)|الفصل\s+(\d+)|الباب\s+(\d+)', prompt.lower())
-                    section_number = section_match.group(1) if section_match and section_match.group(1) else \
-                                    section_match.group(2) if section_match and section_match.group(2) else \
-                                    section_match.group(3) if section_match and section_match.group(3) else \
-                                    section_match.group(4) if section_match and section_match.group(4) else \
-                                    section_match.group(5) if section_match and section_match.group(5) else "?"
-                    
-                    response = t("section_not_found").format(section_number=section_number)
-                
-                sources = []
-        else:
-            # Regular question answering
-            with st.spinner(t("searching")):
-                # Retrieve relevant documents with higher k to ensure we get enough relevant content
-                documents = st.session_state.retriever.retrieve(prompt, k=top_k * 2)
-                
-                # Filter documents more precisely to find the most relevant ones for this specific query
-                # This helps ensure we're reading files that are directly related to the user's question
-                filtered_documents = []
-                for doc in documents:
-                    # Simple relevance check - can be enhanced with more sophisticated methods
-                    if any(term.lower() in doc.page_content.lower() for term in prompt.lower().split()):
-                        filtered_documents.append(doc)
-                
-                # Use at least top_k documents, even if filtering removed some
-                if len(filtered_documents) < top_k and len(documents) >= top_k:
-                    filtered_documents = documents[:top_k]
-                
-                # Prepare context for the LLM using the filtered documents
-                context = ""
-                for doc in filtered_documents:
-                    source = doc.metadata.get("source", "Unknown source")
-                    if "/" in source:
-                        source = source.split("/")[-1]
-                    context += f"\nSource: {source}\n{doc.page_content}\n\n"
-                
-                # Generate answer
-                response = st.session_state.qa_chain.answer_question(prompt, context)
-                
-                # Prepare sources for display
-                sources = []
-                for i, doc in enumerate(documents):
-                    source = doc.metadata.get("source", "Unknown source")
-                    # Extract just the filename from the path
-                    if "/" in source:
-                        source = source.split("/")[-1]
-                    
-                    # Create source object
-                    sources.append({
-                        "source": source,
+                    # Add source information
+                    sources = [{
+                        "source": doc.metadata.get("filename", doc.metadata.get("source", "Unknown")),
                         "content": doc.page_content,
                         "metadata": doc.metadata
-                    })
+                    }]
+                else:
+                    # Article or section not found
+                    if item_type == "article":
+                        # Extract article number from query
+                        import re
+                        article_match = re.search(r'article\s+(\d+)|المادة\s+(\d+)|مادة\s+(\d+)', prompt.lower())
+                        article_number = article_match.group(1) if article_match and article_match.group(1) else \
+                                        article_match.group(2) if article_match and article_match.group(2) else \
+                                        article_match.group(3) if article_match and article_match.group(3) else "?"
+                        
+                        response = t("article_not_found").format(article_number=article_number)
+                    else:  # section
+                        # Extract section number from query
+                        import re
+                        section_match = re.search(r'section\s+(\d+)|chapter\s+(\d+)|القسم\s+(\d+)|الفصل\s+(\d+)|الباب\s+(\d+)', prompt.lower())
+                        section_number = section_match.group(1) if section_match and section_match.group(1) else \
+                                        section_match.group(2) if section_match and section_match.group(2) else \
+                                        section_match.group(3) if section_match and section_match.group(3) else \
+                                        section_match.group(4) if section_match and section_match.group(4) else \
+                                        section_match.group(5) if section_match and section_match.group(5) else "?"
+                        
+                        response = t("section_not_found").format(section_number=section_number)
+                    
+                    sources = []
+            else:
+                # Regular question answering
+                with st.spinner(t("searching")):
+                    # Retrieve relevant documents with higher k to ensure we get enough relevant content
+                    documents = st.session_state.retriever.retrieve(prompt, k=top_k * 2)
+                    
+                    # Filter documents more precisely to find the most relevant ones for this specific query
+                    # This helps ensure we're reading files that are directly related to the user's question
+                    filtered_documents = []
+                    for doc in documents:
+                        # Simple relevance check - can be enhanced with more sophisticated methods
+                        if any(term.lower() in doc.page_content.lower() for term in prompt.lower().split()):
+                            filtered_documents.append(doc)
+                    
+                    # Use at least top_k documents, even if filtering removed some
+                    if len(filtered_documents) < top_k and len(documents) >= top_k:
+                        filtered_documents = documents[:top_k]
+                    
+                    # Prepare context for the LLM using the filtered documents
+                    context = ""
+                    for doc in filtered_documents:
+                        source = doc.metadata.get("source", "Unknown source")
+                        if "/" in source:
+                            source = source.split("/")[-1]
+                        context += f"\nSource: {source}\n{doc.page_content}\n\n"
+                    
+                    # Generate answer
+                    response = st.session_state.qa_chain.answer_question(prompt, context)
+                    
+                    # Prepare sources for display
+                    sources = []
+                    for i, doc in enumerate(documents):
+                        source = doc.metadata.get("source", "Unknown source")
+                        # Extract just the filename from the path
+                        if "/" in source:
+                            source = source.split("/")[-1]
+                        
+                        # Create source object
+                        sources.append({
+                            "source": source,
+                            "content": doc.page_content,
+                            "metadata": doc.metadata
+                        })
     
     # Add assistant response to chat history with sources
     message = {
@@ -611,6 +770,10 @@ if prompt := st.chat_input(t("ask_placeholder")):
     # Display assistant response
     with st.chat_message("assistant"):
         st.markdown(response)
+        
+        # Add text-to-speech button for the response
+        if st.session_state.tts_engine:
+            render_text_to_speech_button(response)
     
     # Show sources if available
     if sources:

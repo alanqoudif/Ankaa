@@ -13,3 +13,11 @@ faiss-cpu>=1.7.4
 transformers>=4.35.0
 torch>=2.1.0
 accelerate>=0.23.0
+# Voice processing dependencies (Level 3)
+vosk>=0.3.45
+sounddevice>=0.4.6
+soundfile>=0.12.1
+openai>=1.3.0
+# Text-to-speech dependencies (Level 3)
+pyttsx3>=2.90
+gtts>=2.3.2
