@@ -258,15 +258,34 @@ class TextToSpeech:
         self.use_pyttsx3 = use_pyttsx3
         self.language = language
         self.engine = None
+        self.initialized = False
         
         # Initialize the appropriate TTS engine
         if use_pyttsx3:
             if not PYTTSX3_AVAILABLE:
-                raise ImportError("pyttsx3 library is required for offline TTS. Install it with 'pip install pyttsx3'.")
-            self.engine = pyttsx3.init()
+                st.warning("pyttsx3 library is required for offline TTS. Install it with 'pip install pyttsx3'.")
+                # Fall back to gTTS if pyttsx3 is not available
+                self.use_pyttsx3 = False
+                if GTTS_AVAILABLE:
+                    st.info("Falling back to gTTS for online text-to-speech.")
+                    self.initialized = True
+                return
+            
+            try:
+                self.engine = pyttsx3.init()
+                self.initialized = True
+            except Exception as e:
+                st.error(f"Error initializing pyttsx3: {e}")
+                # Fall back to gTTS if pyttsx3 initialization fails
+                self.use_pyttsx3 = False
+                if GTTS_AVAILABLE:
+                    st.info("Falling back to gTTS for online text-to-speech.")
+                    self.initialized = True
         else:
             if not GTTS_AVAILABLE:
-                raise ImportError("gTTS library is required for online TTS. Install it with 'pip install gtts'.")
+                st.warning("gTTS library is required for online TTS. Install it with 'pip install gtts'.")
+                return
+            self.initialized = True
     
     def speak(self, text: str) -> str:
         """
@@ -278,6 +297,10 @@ class TextToSpeech:
         Returns:
             Path to the audio file (for gTTS) or empty string (for pyttsx3)
         """
+        if not self.initialized:
+            st.error("Text-to-speech engine is not properly initialized.")
+            return ""
+            
         if self.use_pyttsx3:
             return self._speak_pyttsx3(text)
         else:
@@ -294,6 +317,7 @@ class TextToSpeech:
             Empty string (pyttsx3 plays audio directly)
         """
         if not self.engine:
+            st.error("pyttsx3 engine not initialized.")
             return ""
         
         try:
@@ -301,7 +325,11 @@ class TextToSpeech:
             self.engine.runAndWait()
             return ""
         except Exception as e:
-            print(f"Error speaking text: {e}")
+            st.error(f"Error speaking text with pyttsx3: {e}")
+            # Try falling back to gTTS if pyttsx3 fails
+            if GTTS_AVAILABLE:
+                st.info("Falling back to gTTS for this request.")
+                return self._speak_gtts(text)
             return ""
     
     def _speak_gtts(self, text: str) -> str:

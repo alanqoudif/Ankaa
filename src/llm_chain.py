@@ -216,6 +216,44 @@ Your summary should be brief but comprehensive enough to capture the essence of 
             }
 
 
+def create_local_chain(model_path: str, temperature: float = 0.1, max_tokens: int = 2000) -> LegalQAChain:
+    """
+    Create a QA chain using a local LLM model.
+    
+    Args:
+        model_path: Path to the local LLM model file
+        temperature: Temperature parameter for the LLM
+        max_tokens: Maximum number of tokens to generate
+        
+    Returns:
+        Initialized LegalQAChain
+    """
+    return LegalQAChain(
+        model_path=model_path,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        use_ollama=False
+    )
+
+def create_ollama_chain(model_name: str, temperature: float = 0.1, max_tokens: int = 2000) -> LegalQAChain:
+    """
+    Create a QA chain using an Ollama model.
+    
+    Args:
+        model_name: Name of the Ollama model to use
+        temperature: Temperature parameter for the LLM
+        max_tokens: Maximum number of tokens to generate
+        
+    Returns:
+        Initialized LegalQAChain
+    """
+    return LegalQAChain(
+        temperature=temperature,
+        max_tokens=max_tokens,
+        use_ollama=True,
+        ollama_model=model_name
+    )
+
 if __name__ == "__main__":
     # Example usage with Ollama
     if is_ollama_running():
