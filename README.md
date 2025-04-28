@@ -14,6 +14,10 @@
 <p align="center">An advanced system for intelligent search, legal analysis, and report generation based on Omani laws, with support for both Arabic and English languages, voice interaction, and legal document generation.</p>
 
 <p align="center">
+  <img src="JustPng.png" alt="Sultanate Legal AI Assistant" width="700">
+</p>
+
+<p align="center">
   <img src="https://github.com/alanqoudif/Ankaa/raw/master/docs/images/demo.gif" alt="Demo" width="700">
 </p>
 
@@ -139,14 +143,23 @@ Add the following environment variables to the `.env` file:
 
 ```
 # Example .env file
+
+# Required: OpenRouter API key (get yours at https://openrouter.ai)
 OPENROUTER_API_KEY=your_openrouter_api_key_here
 
 # Optional: Specify default model
+# Available models include: openai/gpt-4-turbo, anthropic/claude-3-opus, google/gemini-pro
 DEFAULT_MODEL=openai/gpt-4-turbo
 
 # Optional: Voice settings
+# Path to Vosk model for offline voice recognition
 VOICE_MODEL_PATH=./models/vosk-model-small-ar
-TEXT_TO_SPEECH_ENGINE=pyttsx3  # Options: pyttsx3, gtts
+
+# Text-to-speech engine (options: pyttsx3 for offline, gtts for online)
+TEXT_TO_SPEECH_ENGINE=pyttsx3
+
+# Optional: Debug mode
+DEBUG_MODE=false
 ```
 
 You can get an OpenRouter API key by signing up at [OpenRouter.ai](https://openrouter.ai/).
