@@ -4,7 +4,14 @@ Supports both Arabic and English documents.
 """
 
 import os
-import fitz  # PyMuPDF
+try:
+    import fitz  # PyMuPDF
+except ImportError:
+    raise ImportError(
+        "Could not import the PyMuPDF library (imported as 'fitz'). "
+        "Please make sure PyMuPDF is installed correctly by running: "
+        "pip install pymupdf==1.23.7"
+    )
 import re
 from typing import List, Dict, Optional, Tuple, Any
 from langchain.schema import Document
