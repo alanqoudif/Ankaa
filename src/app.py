@@ -282,6 +282,9 @@ if 'image_generator' not in st.session_state:
 if 'case_analyzer' not in st.session_state:
     st.session_state.case_analyzer = None
 
+if "embeddings_created" not in st.session_state:
+    st.session_state.embeddings_created = False
+
 if "image_generator" not in st.session_state:
     st.session_state.image_generator = None
 if "generated_pdf" not in st.session_state:
@@ -621,14 +624,6 @@ with st.sidebar:
                     
                 # Initialize document comparator
                 try:
-                    st.session_state.document_comparator = DocumentComparator(
-                        retriever=st.session_state.retriever,
-                        qa_chain=qa_chain
-                    )
-                    st.info("Document comparator initialized successfully")
-                
-                # Initialize document comparator
-                try:
                     from utils.comparison_utils import DocumentComparator
                     
                     # Pass the QA chain directly to the DocumentComparator
@@ -638,6 +633,7 @@ with st.sidebar:
                         llm_or_chain=qa_chain,  # Pass the entire QA chain
                         language=st.session_state.language
                     )
+                    st.info("Document comparator initialized successfully")
                     
                     if getattr(st.session_state.document_comparator, 'initialized', False):
                         st.session_state.initialized = True
