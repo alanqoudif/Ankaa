@@ -477,63 +477,64 @@ class TextToSpeech:
             return ""
 
 
-def download_vosk_model(model_name: str = "vosk-model-small-en-us-0.15") -> str:
-    """
-    Download a Vosk model for offline speech recognition.
-    
-    Args:
-        model_name: Name of the Vosk model to download
-        
-    Returns:
-        Path to the downloaded model
-    """
-    import urllib.request
+def download_vosk_model(model_name="vosk-model-small-en-us-0.15", model_dir="models"):
+    """Download a Vosk model for offline speech recognition."""
+    import os
     import zipfile
-    import shutil
+    import requests
+    import streamlit as st
+    from tqdm import tqdm
     
-    # Get the absolute path to the models directory
-    models_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "models"))
-    os.makedirs(models_dir, exist_ok=True)
+    # Create model directory if it doesn't exist
+    os.makedirs(model_dir, exist_ok=True)
     
-    model_path = os.path.join(models_dir, model_name)
+    # Model URL
+    model_url = f"https://alphacephei.com/vosk/models/{model_name}.zip"
+    model_path = os.path.join(model_dir, model_name)
+    zip_path = os.path.join(model_dir, f"{model_name}.zip")
     
     # Check if model already exists
     if os.path.exists(model_path) and os.path.isdir(model_path) and len(os.listdir(model_path)) > 0:
-        st.success(f"Vosk model already exists at {model_path}")
+        print(f"Vosk model already exists at {model_path}")
         return model_path
-    
-    # URL for the model
-    model_url = f"https://alphacephei.com/vosk/models/{model_name}.zip"
-    
-    # Download the model
-    st.info(f"Downloading Vosk model from {model_url}...")
-    
-    with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as temp_file:
-        temp_file_path = temp_file.name
     
     try:
-        # Create a progress bar
-        progress_bar = st.progress(0)
-        
-        # Define a progress hook for the download
-        def download_progress_hook(count, block_size, total_size):
-            progress = count * block_size / total_size
-            progress_bar.progress(min(progress, 1.0))
-        
-        # Download the model with progress reporting
-        urllib.request.urlretrieve(model_url, temp_file_path, reporthook=download_progress_hook)
-        
-        # Extract the model
-        st.info("Extracting model...")
-        with zipfile.ZipFile(temp_file_path, 'r') as zip_ref:
-            zip_ref.extractall(models_dir)
-        
-        st.success(f"Vosk model downloaded and extracted to {model_path}")
-        return model_path
+        # Download the model
+        with st.spinner(f"Downloading Vosk model from {model_url}..."):
+            print(f"Downloading Vosk model from {model_url}...")
+            response = requests.get(model_url, stream=True)
+            response.raise_for_status()
+            
+            total_size = int(response.headers.get('content-length', 0))
+            block_size = 1024  # 1 Kibibyte
+            
+            progress_bar = st.progress(0)
+            
+            with open(zip_path, 'wb') as f, tqdm(total=total_size, unit='iB', unit_scale=True) as t:
+                downloaded = 0
+                for data in response.iter_content(block_size):
+                    downloaded += len(data)
+                    t.update(len(data))
+                    f.write(data)
+                    # Update progress bar
+                    if total_size > 0:
+                        progress = min(downloaded / total_size, 1.0)
+                        progress_bar.progress(progress)
+            
+            # Extract the model
+            with st.spinner(f"Extracting model to {model_path}..."):
+                print(f"Extracting model to {model_path}...")
+                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                    zip_ref.extractall(model_dir)
+            
+            # Remove the zip file
+            os.remove(zip_path)
+            
+            st.success(f"Vosk model downloaded and extracted to {model_path}")
+            print(f"Vosk model downloaded and extracted to {model_path}")
+            return model_path
     except Exception as e:
-        st.error(f"Error downloading Vosk model: {e}")
-        return ""
-    finally:
-        # Clean up the temporary file
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
+        error_msg = f"Error downloading Vosk model: {e}"
+        st.error(error_msg)
+        print(error_msg)
+        return None

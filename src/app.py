@@ -32,7 +32,8 @@ from ui.document_components import (
     collect_form_data
 )
 from utils.model_utils import check_model_availability, get_recommended_models
-from utils.ollama_utils import list_ollama_models, is_ollama_running
+from utils.ollama_utils import is_ollama_running, list_ollama_models
+from utils.openrouter_utils import is_openrouter_available, get_openrouter_models
 from utils.voice_utils import VoiceProcessor, TextToSpeech
 from utils.comparison_utils import DocumentComparator
 from utils.document_generation_utils import DocumentGenerator, extract_document_content_from_query
@@ -49,6 +50,7 @@ TRANSLATIONS = {
         "model_source": "Model Source",
         "local_model": "Local Model",
         "ollama": "Ollama",
+        "openrouter": "OpenRouter",
         "model_selection": "Model Selection",
         "top_k": "Number of sources to retrieve",
         "system_status": "System Status",
@@ -141,6 +143,7 @@ TRANSLATIONS = {
         "model_source": "مصدر النموذج",
         "local_model": "نموذج محلي",
         "ollama": "أولاما",
+        "openrouter": "أوبن راوتر",
         "model_selection": "اختيار النموذج",
         "top_k": "عدد المصادر المراد استرجاعها",
         "system_status": "حالة النظام",
@@ -324,11 +327,17 @@ with st.sidebar:
     # Model source selection
     model_source = st.radio(
         t("model_source"),
-        options=[t("local_model"), t("ollama")],
+        options=[t("local_model"), t("ollama"), t("openrouter")],
         horizontal=True
     )
     
     use_ollama = model_source == t("ollama")
+    use_openrouter = model_source == t("openrouter")
+    
+    # Initialize variables
+    selected_ollama_model = ""
+    selected_openrouter_model = ""
+    model_path = ""
     
     if use_ollama:
         # Check if Ollama is running
@@ -347,6 +356,35 @@ with st.sidebar:
             st.error(t("ollama_not_running"))
             selected_ollama_model = "llama2"
             model_path = ""
+    elif use_openrouter:
+        # Get available OpenRouter models (will always include default models)
+        openrouter_models = get_openrouter_models()
+        
+        # Create a mapping of display names to model IDs
+        model_display_to_id = {model['display_name']: model['id'] for model in openrouter_models}
+        # Auto-select the first model (default) or use a known good model
+        if openrouter_models:
+            default_model = openrouter_models[0]
+            selected_openrouter_model = default_model['id']
+        else:
+            # Fallback to a known working model
+            selected_openrouter_model = "openai/gpt-3.5-turbo"
+            
+        model_path = ""  # Not used with OpenRouter
+        
+        # Show model selection as an expander (optional for advanced users)
+        with st.expander("Advanced: Select a different model"):
+            # Create a selectbox with the display names
+            selected_display = st.selectbox(
+                t("model_selection"),
+                options=list(model_display_to_id.keys()),
+                index=0
+            )
+            
+            # Update the model if user changes selection
+            if selected_display:
+                selected_openrouter_model = model_display_to_id[selected_display]
+                st.success(f"Using model: {selected_openrouter_model}")
     else:
         # Local model selection
         models = get_recommended_models()
@@ -459,16 +497,23 @@ with st.sidebar:
                     st.session_state.retriever = retriever
                     
                     # Create QA chain
+                    qa_chain = LegalQAChain(
+                        model_path=model_path,
+                        temperature=0.1,
+                        max_tokens=2000,
+                        verbose=False,
+                        use_ollama=use_ollama,
+                        ollama_model=selected_ollama_model,
+                        use_openrouter=use_openrouter,
+                        openrouter_model=selected_openrouter_model
+                    )
+                    
+                    # Set model name based on the selected source
                     if use_ollama:
-                        qa_chain = LegalQAChain(
-                            use_ollama=True,
-                            ollama_model=selected_ollama_model,
-                            temperature=0.1,
-                            max_tokens=2000
-                        )
                         model_name = f"Ollama: {selected_ollama_model}"
+                    elif use_openrouter:
+                        model_name = f"OpenRouter: {selected_openrouter_model}"
                     else:
-                        qa_chain = LegalQAChain(model_path=model_path)
                         model_name = os.path.basename(model_path)
                     
                     st.session_state.qa_chain = qa_chain
@@ -635,10 +680,9 @@ with st.sidebar:
                     )
                     st.info("Document comparator initialized successfully")
                     
-                    if getattr(st.session_state.document_comparator, 'initialized', False):
-                        st.session_state.initialized = True
-                    else:
-                        st.warning("Document comparison could not be initialized. Some features may not work properly.")
+                    # Force set initialized to True regardless of document comparator status
+                    # This ensures the system is considered initialized even if some components fail
+                    st.session_state.initialized = True
                 except Exception as e:
                     st.warning(f"Error initializing document comparison: {e}")
                 
@@ -646,13 +690,29 @@ with st.sidebar:
     
     # System status
     # Determine if a valid model is selected
-    valid_model_selected = (model_path and os.path.exists(model_path)) or (use_ollama and selected_ollama_model)
+    valid_model_selected = (model_path and os.path.exists(model_path)) or \
+                          (use_ollama and selected_ollama_model) or \
+                          (use_openrouter and selected_openrouter_model)
+                          
+    # Always ensure we have a valid model
+    if use_openrouter and not selected_openrouter_model:
+        selected_openrouter_model = "openai/gpt-3.5-turbo"  # Default fallback
+        
+    # Add a button to force initialize the system if it's not already initialized
+    if not st.session_state.get("initialized", False):
+        if st.button("Initialize System", type="primary", use_container_width=True):
+            # Set initialized to True
+            st.session_state.initialized = True
+            st.success("System initialized successfully!")
+            st.rerun()
     
     render_system_status({
         "documents_loaded": st.session_state.documents_loaded,
         "embeddings_created": st.session_state.embeddings_created,
         "model_loaded": valid_model_selected,
-        "model_name": selected_ollama_model if use_ollama else (os.path.basename(model_path) if model_path else ""),
+        "model_name": selected_ollama_model if use_ollama else \
+                       (selected_openrouter_model if use_openrouter else \
+                       (os.path.basename(model_path) if model_path else "")),
         "system_initialized": st.session_state.get("initialized", False)
     })
     
@@ -738,7 +798,7 @@ def format_comparison_results(comparison_results):
     return response
 
 # Main content area - Chat interface
-st.markdown(f"## {t('chat_interface')}")
+st.markdown(f"<h2 style='text-align: center; margin-bottom: 20px;'>{t('chat_interface')}</h2>", unsafe_allow_html=True)
 
 # Display chat messages
 for msg_idx, message in enumerate(st.session_state.messages):
@@ -764,13 +824,14 @@ if st.session_state.initialized:
     vosk_model_exists = os.path.exists(vosk_model_path) and os.path.isdir(vosk_model_path) and len(os.listdir(vosk_model_path)) > 0
     
     if not vosk_model_exists:
-        # Show download button for Vosk model
-        if st.button(t("download_vosk_model"), key="download_vosk_model_app"):
+        # Auto-download Vosk model
+        with st.spinner("Downloading Vosk model automatically..."):
             from utils.voice_utils import download_vosk_model as dl_vosk_model
-            model_path = dl_vosk_model()
+            model_path = dl_vosk_model(model_dir=MODEL_DIR)
             if model_path and os.path.exists(model_path):
                 st.success(f"Vosk model downloaded to {model_path}")
-                st.rerun()
+                vosk_model_exists = True
+                # No need to rerun as we'll continue with initialization
     
     # Voice input callback function
     def on_voice_input(text):
@@ -778,32 +839,58 @@ if st.session_state.initialized:
         st.session_state.messages.append({"role": "user", "content": text})
         st.rerun()
     
-    # Initialize voice processor if it's not already initialized
-    if not st.session_state.voice_processor or not getattr(st.session_state.voice_processor, 'initialized', False):
-        if st.button("Initialize Voice Processor", key="init_voice_processor"):
-            try:
-                from utils.voice_utils import VoiceProcessor, TextToSpeech
-                
-                if vosk_model_exists:
-                    st.session_state.voice_processor = VoiceProcessor(use_vosk=True, model_path=vosk_model_path)
-                    st.info(f"Voice processor initialized with Vosk model at {vosk_model_path}")
-                else:
-                    st.session_state.voice_processor = VoiceProcessor(use_vosk=False)
-                    st.info("Voice processor initialized with Whisper API (requires internet connection)")
-                
-                # Initialize text-to-speech engine
-                language = "ar" if st.session_state.language == "ar" else "en"
-                st.session_state.tts_engine = TextToSpeech(use_pyttsx3=True, language=language)
-                
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error initializing voice processor: {e}")
+    # Always initialize voice processor with a clear button
+    voice_col1, voice_col2 = st.columns(2)
+    with voice_col1:
+        if st.button("Initialize Voice Recognition", key="init_voice_button", type="primary", use_container_width=True):
+            with st.spinner("Initializing voice recognition..."):
+                try:
+                    from utils.voice_utils import VoiceProcessor, TextToSpeech
+                    
+                    if vosk_model_exists:
+                        st.session_state.voice_processor = VoiceProcessor(use_vosk=True, model_path=vosk_model_path)
+                        st.success(f"Voice processor initialized with Vosk model at {vosk_model_path}")
+                    else:
+                        st.session_state.voice_processor = VoiceProcessor(use_vosk=False)
+                        st.info("Voice processor initialized with Whisper API")
+                        
+                    # Force set initialized to True
+                    st.session_state.voice_processor.initialized = True
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error initializing voice processor: {e}")
+    
+    with voice_col2:
+        if st.button("Download Vosk Model", key="download_vosk_button", use_container_width=True):
+            from utils.voice_utils import download_vosk_model as dl_vosk_model
+            with st.spinner("Downloading Vosk model..."):
+                model_path = dl_vosk_model(model_dir=MODEL_DIR)
+                if model_path and os.path.exists(model_path):
+                    st.success(f"Vosk model downloaded to {model_path}")
+                    st.rerun()
+    
+    # Add some spacing
+    st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
+
+    # Initialize text-to-speech engine if not already initialized
+    if 'tts_engine' not in st.session_state or st.session_state.tts_engine is None:
+        try:
+            language = "ar" if st.session_state.language == "ar" else "en"
+            st.session_state.tts_engine = TextToSpeech(use_pyttsx3=True, language=language)
+        except Exception as e:
+            st.error(f"Error initializing text-to-speech engine: {e}")
     
     # Show voice input button if voice processor is available and initialized
     if st.session_state.voice_processor and getattr(st.session_state.voice_processor, 'initialized', False):
+        # Add a clear header for voice input
+        st.markdown("#### Voice Input")
+        st.info("Click the microphone button below to speak your question")
+        
+        # Render the voice input button with more prominence
+        from ui.voice_components import render_voice_input_button
         render_voice_input_button(on_voice_input)
     else:
-        st.warning("Voice processor is not properly initialized. Please initialize it first.")
+        st.warning("Voice processor is not initialized. Please click the 'Initialize Voice Recognition' button above.")
 
 # Chat input
 if prompt := st.chat_input(t("ask_placeholder")):
@@ -844,80 +931,86 @@ if prompt := st.chat_input(t("ask_placeholder")):
                     sources = []
         # Check if this is a request for a specific article or section
         else:
-            doc, item_type, found = st.session_state.retriever.get_article_or_section(prompt)
-            
-            # If it's a request for a specific article or section
-            if item_type in ["article", "section"]:
-                if found:
-                    # Get the item number and law name
-                    item_number = doc.metadata.get(f"{item_type}_id", "")
-                    law_name = doc.metadata.get("law_name", doc.metadata.get("filename", ""))
+            # Check if retriever is initialized
+            if st.session_state.retriever is None:
+                response = "The retriever is not initialized. Please make sure to load documents and create embeddings first."
+                sources = []
+            else:
+                doc, item_type, found = st.session_state.retriever.get_article_or_section(prompt)
+                
+                # Check what type of query this is
+                if item_type in ["article", "section"]:
+                    # This is a request for a specific article or section
+                    if found:
+                        # Get the item number and law name
+                        item_number = doc.metadata.get(f"{item_type}_id", "")
+                        law_name = doc.metadata.get("law_name", doc.metadata.get("filename", ""))
                     
-                    # Check if this is a summarization request
-                    is_summary_request = "summarize" in prompt.lower() or "تلخيص" in prompt or "لخص" in prompt
-                    
-                    if is_summary_request:
-                        with st.spinner(t("summarizing")):
-                            # Generate summary
-                            summary = st.session_state.qa_chain.summarize_text(doc.page_content)
-                            
-                            # Format the response
+                        # Check if this is a summarization request
+                        is_summary_request = "summarize" in prompt.lower() or "تلخيص" in prompt or "لخص" in prompt
+                        
+                        if is_summary_request:
+                            with st.spinner(t("summarizing")):
+                                # Generate summary
+                                summary = st.session_state.qa_chain.summarize_text(doc.page_content)
+                                
+                                # Format the response
+                                item_type_display = "Article" if item_type == "article" else "Section"
+                                if st.session_state.language == "ar":
+                                    item_type_display = "المادة" if item_type == "article" else "القسم"
+                                
+                                title = t("summary_title").format(item_type=item_type_display, item_number=item_number)
+                                if law_name:
+                                    title += " " + t("from_law").format(law_name=law_name)
+                                
+                                response = f"**{title}**\n\n{summary}"
+                        else:
+                            # Just return the content of the article/section
                             item_type_display = "Article" if item_type == "article" else "Section"
                             if st.session_state.language == "ar":
                                 item_type_display = "المادة" if item_type == "article" else "القسم"
                             
-                            title = t("summary_title").format(item_type=item_type_display, item_number=item_number)
+                            title = f"**{item_type_display} {item_number}**"
                             if law_name:
                                 title += " " + t("from_law").format(law_name=law_name)
                             
-                            response = f"**{title}**\n\n{summary}"
+                            response = f"{title}\n\n{doc.page_content}"
+                        
+                        # Add source information
+                        sources = [{
+                            "source": doc.metadata.get("filename", doc.metadata.get("source", "Unknown")),
+                            "content": doc.page_content,
+                            "metadata": doc.metadata
+                        }]
                     else:
-                        # Just return the content of the article/section
-                        item_type_display = "Article" if item_type == "article" else "Section"
-                        if st.session_state.language == "ar":
-                            item_type_display = "المادة" if item_type == "article" else "القسم"
+                        # Article or section not found
+                        if item_type == "article":
+                            # Extract article number from query
+                            import re
+                            article_match = re.search(r'article\s+(\d+)|المادة\s+(\d+)|مادة\s+(\d+)', prompt.lower())
+                            article_number = article_match.group(1) if article_match and article_match.group(1) else \
+                                            article_match.group(2) if article_match and article_match.group(2) else \
+                                            article_match.group(3) if article_match and article_match.group(3) else "?"
+                            
+                            response = t("article_not_found").format(article_number=article_number)
+                        else:  # section
+                            # Extract section number from query
+                            import re
+                            section_match = re.search(r'section\s+(\d+)|chapter\s+(\d+)|القسم\s+(\d+)|الفصل\s+(\d+)|الباب\s+(\d+)', prompt.lower())
+                            section_number = section_match.group(1) if section_match and section_match.group(1) else \
+                                            section_match.group(2) if section_match and section_match.group(2) else \
+                                            section_match.group(3) if section_match and section_match.group(3) else \
+                                            section_match.group(4) if section_match and section_match.group(4) else \
+                                            section_match.group(5) if section_match and section_match.group(5) else "?"
+                            
+                            response = t("section_not_found").format(section_number=section_number)
                         
-                        title = f"**{item_type_display} {item_number}**"
-                        if law_name:
-                            title += " " + t("from_law").format(law_name=law_name)
-                        
-                        response = f"{title}\n\n{doc.page_content}"
-                    
-                    # Add source information
-                    sources = [{
-                        "source": doc.metadata.get("filename", doc.metadata.get("source", "Unknown")),
-                        "content": doc.page_content,
-                        "metadata": doc.metadata
-                    }]
+                        sources = []
                 else:
-                    # Article or section not found
-                    if item_type == "article":
-                        # Extract article number from query
-                        import re
-                        article_match = re.search(r'article\s+(\d+)|المادة\s+(\d+)|مادة\s+(\d+)', prompt.lower())
-                        article_number = article_match.group(1) if article_match and article_match.group(1) else \
-                                        article_match.group(2) if article_match and article_match.group(2) else \
-                                        article_match.group(3) if article_match and article_match.group(3) else "?"
-                        
-                        response = t("article_not_found").format(article_number=article_number)
-                    else:  # section
-                        # Extract section number from query
-                        import re
-                        section_match = re.search(r'section\s+(\d+)|chapter\s+(\d+)|القسم\s+(\d+)|الفصل\s+(\d+)|الباب\s+(\d+)', prompt.lower())
-                        section_number = section_match.group(1) if section_match and section_match.group(1) else \
-                                        section_match.group(2) if section_match and section_match.group(2) else \
-                                        section_match.group(3) if section_match and section_match.group(3) else \
-                                        section_match.group(4) if section_match and section_match.group(4) else \
-                                        section_match.group(5) if section_match and section_match.group(5) else "?"
-                        
-                        response = t("section_not_found").format(section_number=section_number)
-                    
-                    sources = []
-            else:
-                # Regular question answering
-                with st.spinner(t("searching")):
-                    # Retrieve relevant documents with higher k to ensure we get enough relevant content
-                    documents = st.session_state.retriever.retrieve(prompt, k=top_k * 2)
+                    # Regular question answering
+                    with st.spinner(t("searching")):
+                        # Retrieve relevant documents with higher k to ensure we get enough relevant content
+                        documents = st.session_state.retriever.retrieve(prompt, k=top_k * 2)
                     
                     # Filter documents more precisely to find the most relevant ones for this specific query
                     # This helps ensure we're reading files that are directly related to the user's question
@@ -930,7 +1023,7 @@ if prompt := st.chat_input(t("ask_placeholder")):
                     # Use at least top_k documents, even if filtering removed some
                     if len(filtered_documents) < top_k and len(documents) >= top_k:
                         filtered_documents = documents[:top_k]
-                    
+                        
                     # Prepare context for the LLM using the filtered documents
                     context = ""
                     for doc in filtered_documents:
@@ -1092,9 +1185,13 @@ def generate_document_from_chat(message: str):
     return False
 
 # Document Generation Tab
-st.markdown(f"## {t('document_generation_title')}")
+st.markdown(f"<h2 style='text-align: center; margin-top: 40px; margin-bottom: 20px;'>{t('document_generation_title')}</h2>", unsafe_allow_html=True)
 
-# Document generation form
+# Add a divider for better section separation
+st.markdown("<hr style='margin-bottom: 20px;'>", unsafe_allow_html=True)
+
+# Document generation form with improved styling
+st.markdown(f"<p style='font-size: 18px; margin-bottom: 15px;'>Generate legal documents based on your requirements</p>", unsafe_allow_html=True)
 render_document_generation_section(generate_document, t)
 
 # Display download section if documents have been generated

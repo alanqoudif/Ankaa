@@ -4,19 +4,35 @@
   <img src="https://img.shields.io/badge/Python-3.10%2B-blue" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/LangChain-Enabled-green" alt="LangChain">
   <img src="https://img.shields.io/badge/Streamlit-UI-red" alt="Streamlit">
+  <img src="https://img.shields.io/badge/OpenRouter-Integrated-purple" alt="OpenRouter">
+  <img src="https://img.shields.io/badge/Vosk-Voice_Recognition-orange" alt="Vosk">
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License">
 </div>
 
 <div dir="rtl">
 <h2>مساعد ذكاء اصطناعي قانوني متكامل لسلطنة عمان</h2>
-<p>نظام متطور يتيح البحث الذكي والتحليل القانوني وإنشاء التقارير استناداً إلى القوانين العمانية، مع دعم اللغتين العربية والإنجليزية.</p>
+<p>نظام متطور يتيح البحث الذكي والتحليل القانوني وإنشاء التقارير استناداً إلى القوانين العمانية، مع دعم اللغتين العربية والإنجليزية، والتفاعل الصوتي، وإنشاء المستندات القانونية.</p>
 </div>
 
 <p align="center">
   <img src="https://github.com/alanqoudif/Ankaa/raw/master/docs/images/demo.gif" alt="Demo" width="700">
 </p>
 
-## 📋 جدول المحتويات
+<div align="center">
+  <h3>🌐 <a href="#english-readme">English</a> | <a href="#arabic-readme">العربية</a> 🌐</h3>
+</div>
+
+<h2 id="english-readme">📋 Table of Contents (English)</h2>
+
+- [🔍 Overview](#overview)
+- [🔎 Features](#features)
+- [🌟 New Features](#new-features)
+- [💻 System Requirements](#system-requirements)
+- [⚙️ Installation and Setup](#installation-and-setup)
+- [🚀 Usage](#usage)
+- [💡 Examples](#examples)
+
+<h2 id="arabic-readme">📋 جدول المحتويات (العربية)</h2>
 
 - [🔍 نظرة عامة](#نظرة-عامة)
 - [🔎 المستوى الأول - بوت البحث الذكي](#المستوى-الأول---بوت-البحث-الذكي)
@@ -24,11 +40,44 @@
 - [🔄 المستوى الثالث - مقارنة القوانين والتفاعل الصوتي](#المستوى-الثالث---مقارنة-القوانين-والتفاعل-الصوتي)
 - [📝 المستوى الرابع - إنشاء المستندات القانونية](#المستوى-الرابع---إنشاء-المستندات-القانونية)
 - [📊 المستوى الخامس - التقارير الذكية ودراسة الحالات](#المستوى-الخامس---التقارير-الذكية-ودراسة-الحالات)
+- [🌟 الميزات الجديدة](#الميزات-الجديدة)
 - [💻 متطلبات النظام](#متطلبات-النظام)
 - [⚙️ التثبيت والإعداد](#التثبيت-والإعداد)
 - [🗂️ هيكل المشروع](#هيكل-المشروع)
 - [🚀 استخدام النظام](#استخدام-النظام)
 - [💡 أمثلة على الاستخدام](#أمثلة-على-الاستخدام)
+
+## Overview
+
+The Sultanate Legal AI Assistant is a comprehensive legal assistant designed for Omani laws. It combines advanced AI technologies to provide accurate answers, legal document analysis, voice interaction, and document generation capabilities. The system supports both Arabic and English languages, making it accessible to a wider audience.
+
+## Features
+
+- **Intelligent Search**: Search and answer questions based on Omani legal documents
+- **Legal Document Analysis**: Extract and analyze specific articles and sections from legal texts
+- **Law Comparison**: Compare different laws and identify similarities and differences
+- **Voice Interaction**: Interact with the system using voice commands and queries
+- **Document Generation**: Create legal documents based on user requirements
+- **Multi-language Support**: Full support for both Arabic and English
+
+## New Features
+
+### OpenRouter Integration
+- Added support for OpenRouter API to access powerful language models
+- Automatic model selection and fallback mechanisms
+- Enhanced response quality for legal queries
+
+### Voice Recognition Improvements
+- Integrated Vosk for offline voice recognition
+- Added automatic model downloading
+- Enhanced voice processing capabilities
+- Improved error handling and user feedback
+
+### UI Enhancements
+- Reorganized interface for better user experience
+- Clear sections for different functionalities
+- Improved visual feedback and styling
+- Better organization of system components
 
 ## نظرة عامة
 
@@ -448,3 +497,22 @@ companies between different Omani laws
 
 </div>
 </div>
+
+## الميزات الجديدة
+
+### تكامل OpenRouter
+- إضافة دعم لواجهة برمجة تطبيقات OpenRouter للوصول إلى نماذج لغوية قوية
+- اختيار تلقائي للنموذج وآليات الرجوع الاحتياطي
+- تحسين جودة الردود للاستفسارات القانونية
+
+### تحسينات التعرف على الصوت
+- دمج Vosk للتعرف على الصوت دون اتصال بالإنترنت
+- إضافة تنزيل تلقائي للنموذج
+- تعزيز قدرات معالجة الصوت
+- تحسين معالجة الأخطاء والتغذية الراجعة للمستخدم
+
+### تحسينات واجهة المستخدم
+- إعادة تنظيم الواجهة لتحسين تجربة المستخدم
+- أقسام واضحة للوظائف المختلفة
+- تحسين التغذية الراجعة المرئية والتصميم
+- تنظيم أفضل لمكونات النظام

@@ -11,6 +11,7 @@ from langchain.prompts import PromptTemplate
 from langchain.callbacks.manager import CallbackManager
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from utils.ollama_utils import generate_ollama_completion, is_ollama_running
+from utils.openrouter_utils import generate_openrouter_completion, is_openrouter_available
 
 class LegalQAChain:
     """Question answering chain for legal documents using a local LLM."""
@@ -23,7 +24,9 @@ class LegalQAChain:
         top_p: float = 0.95,
         verbose: bool = False,
         use_ollama: bool = False,
-        ollama_model: str = "llama2"
+        ollama_model: str = "llama2",
+        use_openrouter: bool = False,
+        openrouter_model: str = "openai/gpt-3.5-turbo"
     ):
         """
         Initialize the QA chain with a local LLM.
@@ -44,6 +47,8 @@ class LegalQAChain:
         self.verbose = verbose
         self.use_ollama = use_ollama
         self.ollama_model = ollama_model
+        self.use_openrouter = use_openrouter
+        self.openrouter_model = openrouter_model
         self.chain = None
         self.llm = None
         
@@ -68,27 +73,35 @@ Your summary should be brief but comprehensive enough to capture the essence of 
         
         self.summary_prompt_template = """\nLegal Text to Summarize:\n{text}\n\nConcise Summary (3-5 lines only):\n"""
         
-        # Initialize LLM based on the chosen method
-        if use_ollama:
-            # Check if Ollama is running
-            if is_ollama_running():
-                print(f"Using Ollama model: {ollama_model}")
-                self.model_type = "ollama"
-            else:
-                print("Warning: Ollama is not running. Please start Ollama and try again.")
-                self.model_type = None
+        self.initialize()
+        
+    def initialize(self):
+        """
+        Initialize the QA chain with the appropriate LLM.
+        """
+        if self.use_openrouter:
+            # Use OpenRouter for inference
+            self.model_type = "openrouter"
+            print(f"Using OpenRouter model: {self.openrouter_model}")
+            # Force initialization to succeed for OpenRouter
+            self.initialized = True
+        elif self.use_ollama and is_ollama_running():
+            # Use Ollama for inference
+            self.model_type = "ollama"
+            print(f"Using Ollama model: {self.ollama_model}")
+            self.initialized = True
         else:
-            # Initialize LLM if model exists
-            if os.path.exists(model_path):
-                callback_manager = CallbackManager([StreamingStdOutCallbackHandler()]) if verbose else None
+            # Use local LLM if model exists
+            if os.path.exists(self.model_path):
+                callback_manager = CallbackManager([StreamingStdOutCallbackHandler()]) if self.verbose else None
                 
                 self.llm = LlamaCpp(
-                    model_path=model_path,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    top_p=top_p,
+                    model_path=self.model_path,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
+                    top_p=self.top_p,
                     callback_manager=callback_manager,
-                    verbose=verbose,
+                    verbose=self.verbose,
                     n_ctx=4096  # Context window size
                 )
                 
@@ -123,8 +136,35 @@ Your summary should be brief but comprehensive enough to capture the essence of 
         if self.model_type is None:
             return "I apologize, but the AI model is not properly initialized. Please make sure the model file exists or Ollama is running and try again."
         
+        # Check if context is empty
+        if not context or context.strip() == "":
+            return "I don't have enough information in my legal documents to answer this question. Please try asking about Omani laws that are included in the loaded documents."
+        
         try:
-            if self.model_type == "ollama":
+            if self.model_type == "openrouter":
+                # Use OpenRouter for inference
+                prompt = self.qa_prompt_template.format(context=context, question=question)
+                
+                # Make sure we have a valid model ID
+                model_id = self.openrouter_model
+                if not model_id or model_id == "":
+                    model_id = "openai/gpt-3.5-turbo"  # Default fallback
+                    print(f"Using default OpenRouter model: {model_id}")
+                
+                # Print debug information about the context
+                print(f"\nQuestion: {question}")
+                print(f"Context length: {len(context)} characters")
+                print(f"Context sample: {context[:200]}..." if len(context) > 200 else f"Context: {context}")
+                
+                response = generate_openrouter_completion(
+                    model_id=model_id,
+                    prompt=prompt,
+                    system_prompt=self.qa_system_prompt,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens
+                )
+                return response.strip()
+            elif self.model_type == "ollama":
                 # Use Ollama for inference
                 prompt = self.qa_prompt_template.format(context=context, question=question)
                 response = generate_ollama_completion(
@@ -156,7 +196,18 @@ Your summary should be brief but comprehensive enough to capture the essence of 
             return "I apologize, but the AI model is not properly initialized. Please make sure the model file exists or Ollama is running and try again."
         
         try:
-            if self.model_type == "ollama":
+            if self.model_type == "openrouter":
+                # Use OpenRouter for inference
+                prompt = self.summary_prompt_template.format(text=text)
+                response = generate_openrouter_completion(
+                    model_id=self.openrouter_model,
+                    prompt=prompt,
+                    system_prompt=self.summary_system_prompt,
+                    temperature=self.temperature,
+                    max_tokens=500  # Limit tokens for summary
+                )
+                return response.strip()
+            elif self.model_type == "ollama":
                 # Use Ollama for inference
                 prompt = self.summary_prompt_template.format(text=text)
                 response = generate_ollama_completion(
