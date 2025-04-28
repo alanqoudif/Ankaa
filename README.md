@@ -138,8 +138,18 @@ touch .env
 Add the following environment variables to the `.env` file:
 
 ```
+# Example .env file
 OPENROUTER_API_KEY=your_openrouter_api_key_here
+
+# Optional: Specify default model
+DEFAULT_MODEL=openai/gpt-4-turbo
+
+# Optional: Voice settings
+VOICE_MODEL_PATH=./models/vosk-model-small-ar
+TEXT_TO_SPEECH_ENGINE=pyttsx3  # Options: pyttsx3, gtts
 ```
+
+You can get an OpenRouter API key by signing up at [OpenRouter.ai](https://openrouter.ai/).
 
 ### Step 5: Run the Application
 
@@ -288,15 +298,15 @@ a company in Oman?
 ```
 
 ```
-ما هي شروط الحصول على الجنسية العمانية؟
+What are the requirements for obtaining Omani citizenship?
 ```
 </div>
 
 <div style="flex: 1; min-width: 300px; background-color: #f0f7ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #0369a1;">
-<h3>📑 استخراج مواد قانونية محددة</h3>
+<h3>📑 Extract Specific Legal Articles</h3>
 
 ```
-أعطني المادة 150 من قانون الجزاء العماني
+Show me Article 150 of the Omani Penal Code
 ```
 
 ```
@@ -304,15 +314,15 @@ Show me Article 25 of the Omani Labor Law
 ```
 
 ```
-ما هي المادة 10 من قانون الشركات التجارية؟
+What is Article 10 of the Commercial Companies Law?
 ```
 </div>
 
 <div style="flex: 1; min-width: 300px; background-color: #f0fff4; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #166534;">
-<h3>🔄 مقارنة القوانين</h3>
+<h3>🔄 Compare Laws</h3>
 
 ```
-قارن بين قانون العمل وقانون الخدمة المدنية فيما يتعلق بالإجازات
+Compare the Labor Law and Civil Service Law regarding vacations
 ```
 
 ```
@@ -322,56 +332,56 @@ companies between different Omani laws
 </div>
 
 <div style="flex: 1; min-width: 300px; background-color: #fff7ed; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #c2410c;">
-<h3>🎤 التفاعل الصوتي</h3>
+<h3>🎤 Voice Interaction</h3>
 
-<p>• انقر على زر <strong>"إدخال صوتي"</strong> واطرح سؤالك شفهياً</p>
+<p>• Click the <strong>"Voice Input"</strong> button and ask your question verbally</p>
 
-<p>• انقر على زر <strong>"قراءة بصوت عالٍ"</strong> لسماع الإجابة</p>
+<p>• Click the <strong>"Read Aloud"</strong> button to hear the answer</p>
 </div>
 
 <div style="flex: 1; min-width: 300px; background-color: #faf5ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #7e22ce;">
-<h3>📝 إنشاء المستندات القانونية</h3>
+<h3>📝 Create Legal Documents</h3>
 
-<p>استخدم قسم "إنشاء المستندات" لإنشاء:</p>
+<p>Use the "Generate Documents" section to create:</p>
 
 <ul>
-  <li>عقود العمل</li>
-  <li>عقود الإيجار</li>
-  <li>عقود الخدمات</li>
-  <li>التفويضات القانونية</li>
+  <li>Employment contracts</li>
+  <li>Lease agreements</li>
+  <li>Service contracts</li>
+  <li>Legal authorizations</li>
 </ul>
 </div>
 
 <div style="flex: 1; min-width: 300px; background-color: #f0f9ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #0284c7;">
-<h3>📊 تحليل السيناريوهات وإنشاء التقارير</h3>
+<h3>📊 Scenario Analysis and Report Generation</h3>
 
 ```
-مواطن استثمر أموالاً في الخارج بدون أن يصرح بها للسلطات العمانية، ما هي الآثار القانونية؟ أريد تقرير PDF
+A citizen invested money abroad without declaring it to Omani authorities. What are the legal implications? I need a PDF report.
 ```
 
 ```
-شركة قامت بتسريح موظف دون إشعار مسبق، ما هي حقوق الموظف وفقاً للقانون العماني؟
+A company terminated an employee without prior notice. What are the employee's rights according to Omani law?
 ```
 </div>
 
 </div>
 </div>
 
-## الميزات الجديدة
+## New Features
 
-### تكامل OpenRouter
-- إضافة دعم لواجهة برمجة تطبيقات OpenRouter للوصول إلى نماذج لغوية قوية
-- اختيار تلقائي للنموذج وآليات الرجوع الاحتياطي
-- تحسين جودة الردود للاستفسارات القانونية
+### OpenRouter Integration
+- Added support for OpenRouter API to access powerful language models
+- Automatic model selection and fallback mechanisms
+- Improved response quality for legal queries
 
-### تحسينات التعرف على الصوت
-- دمج Vosk للتعرف على الصوت دون اتصال بالإنترنت
-- إضافة تنزيل تلقائي للنموذج
-- تعزيز قدرات معالجة الصوت
-- تحسين معالجة الأخطاء والتغذية الراجعة للمستخدم
+### Voice Recognition Improvements
+- Integrated Vosk for offline voice recognition
+- Added automatic model downloading
+- Enhanced voice processing capabilities
+- Improved error handling and user feedback
 
-### تحسينات واجهة المستخدم
-- إعادة تنظيم الواجهة لتحسين تجربة المستخدم
-- أقسام واضحة للوظائف المختلفة
-- تحسين التغذية الراجعة المرئية والتصميم
-- تنظيم أفضل لمكونات النظام
+### UI Enhancements
+- Reorganized interface for better user experience
+- Clear sections for different functionalities
+- Improved visual feedback and styling
+- Better organization of system components
