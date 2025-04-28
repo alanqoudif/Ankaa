@@ -37,6 +37,7 @@ from utils.voice_utils import VoiceProcessor, TextToSpeech
 from utils.comparison_utils import DocumentComparator
 from utils.document_generation_utils import DocumentGenerator, extract_document_content_from_query
 from utils.image_generation_utils import ImageGenerator
+from utils.case_analysis_utils import LegalCaseAnalyzer
 
 # Dictionary for translations
 TRANSLATIONS = {
@@ -255,32 +256,32 @@ if "initialized" not in st.session_state:
     st.session_state.initialized = False
 if "documents_loaded" not in st.session_state:
     st.session_state.documents_loaded = 0
-if "embeddings_created" not in st.session_state:
-    st.session_state.embeddings_created = False
-if "model_loaded" not in st.session_state:
-    st.session_state.model_loaded = False
-if "model_name" not in st.session_state:
-    st.session_state.model_name = "None"
-if "show_sources" not in st.session_state:
-    st.session_state.show_sources = False
-if "current_sources" not in st.session_state:
-    st.session_state.current_sources = []
-if "embedder" not in st.session_state:
     st.session_state.embedder = None
-if "retriever" not in st.session_state:
+
+if 'retriever' not in st.session_state:
     st.session_state.retriever = None
-if "qa_chain" not in st.session_state:
+
+if 'qa_chain' not in st.session_state:
     st.session_state.qa_chain = None
-if "voice_processor" not in st.session_state:
+
+if 'voice_processor' not in st.session_state:
     st.session_state.voice_processor = None
-if "tts_engine" not in st.session_state:
+
+if 'tts_engine' not in st.session_state:
     st.session_state.tts_engine = None
-if "document_comparator" not in st.session_state:
+
+if 'document_comparator' not in st.session_state:
     st.session_state.document_comparator = None
-if "is_recording" not in st.session_state:
-    st.session_state.is_recording = False
-if "document_generator" not in st.session_state:
+
+if 'document_generator' not in st.session_state:
     st.session_state.document_generator = None
+
+if 'image_generator' not in st.session_state:
+    st.session_state.image_generator = None
+    
+if 'case_analyzer' not in st.session_state:
+    st.session_state.case_analyzer = None
+
 if "image_generator" not in st.session_state:
     st.session_state.image_generator = None
 if "generated_pdf" not in st.session_state:
@@ -594,12 +595,37 @@ with st.sidebar:
                     language = "ar" if st.session_state.language == "ar" else "en"
                     st.session_state.tts_engine = TextToSpeech(use_pyttsx3=True, language=language)
                     st.info("Text-to-speech engine initialized successfully")
-                    
                 except ImportError as e:
                     st.warning(f"Voice processing not available: {e}")
                     st.info("Install voice processing dependencies with: pip install vosk sounddevice soundfile pyttsx3 gtts")
                 except Exception as e:
                     st.warning(f"Error initializing voice processing: {e}")
+                
+                # Initialize document generator and image generator
+                try:
+                    st.session_state.document_generator = DocumentGenerator()
+                    st.session_state.image_generator = ImageGenerator()
+                    st.info("Document and image generators initialized successfully")
+                except Exception as e:
+                    st.warning(f"Document generation not available: {e}")
+                    
+                # Initialize case analyzer for Level 5 functionality
+                try:
+                    st.session_state.case_analyzer = LegalCaseAnalyzer(
+                        retriever=st.session_state.retriever,
+                        qa_chain=qa_chain
+                    )
+                    st.info("Legal case analyzer initialized successfully")
+                except Exception as e:
+                    st.warning(f"Legal case analysis not available: {e}")
+                    
+                # Initialize document comparator
+                try:
+                    st.session_state.document_comparator = DocumentComparator(
+                        retriever=st.session_state.retriever,
+                        qa_chain=qa_chain
+                    )
+                    st.info("Document comparator initialized successfully")
                 
                 # Initialize document comparator
                 try:
