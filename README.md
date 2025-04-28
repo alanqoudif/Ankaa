@@ -171,138 +171,135 @@ You can get an OpenRouter API key by signing up at [OpenRouter.ai](https://openr
 streamlit run src/app.py
 ```
 
-بعد تشغيل الأمر، سيفتح المتصفح تلقائياً على الرابط `http://localhost:8501`
+After running the command, the browser will automatically open at `http://localhost:8501`
 
-## هيكل المشروع
+## Project Structure
 
 ```
 .
 ├── README.md
 ├── requirements.txt
 ├── src
-│   ├── app.py                     # نقطة الدخول الرئيسية للتطبيق
-│   ├── data/                      # مجلد للوثائق القانونية
-│   ├── document_loader.py         # وظائف تحميل وتحليل المستندات
-│   ├── document_structure.py      # تعريف هيكل المستندات
-│   ├── embeddings.py              # إنشاء التضمينات المتجهية
-│   ├── llm_chain.py               # سلسلة LLM للأسئلة والأجوبة
-│   ├── models/                    # مجلد لنماذج اللغة والتضمين
-│   ├── retriever.py               # استرجاع المستندات ذات الصلة
-│   ├── setup.py                   # إعداد المشروع
-│   ├── ui/                        # مكونات واجهة المستخدم
-│   │   ├── components.py          # مكونات واجهة المستخدم الأساسية
-│   │   ├── document_components.py # مكونات إنشاء المستندات
-│   │   └── voice_components.py    # مكونات التفاعل الصوتي
-│   └── utils/                     # وظائف مساعدة
-│       ├── arabic_utils.py        # معالجة اللغة العربية
-│       ├── case_analysis_utils.py # تحليل القضايا القانونية
-│       ├── comparison_utils.py    # مقارنة القوانين
-│       ├── document_generation_utils.py # إنشاء المستندات
-│       ├── document_utils.py      # معالجة المستندات
-│       ├── image_generation_utils.py # إنشاء صور المستندات
-│       ├── model_utils.py         # إدارة النماذج
-│       ├── ollama_utils.py        # التكامل مع Ollama
-│       └── voice_utils.py         # معالجة الصوت
-└── chroma_db/                     # قاعدة بيانات ChromaDB
+│   ├── app.py                     # Main entry point for the application
+│   ├── data/                      # Folder for legal documents
+│   ├── document_loader.py         # Document loading and parsing functions
+│   ├── document_structure.py      # Document structure definitions
+│   ├── embeddings.py              # Vector embeddings creation
+│   ├── llm_chain.py               # LLM chain for Q&A
+│   ├── models/                    # Folder for language and embedding models
+│   ├── retriever.py               # Relevant document retrieval
+│   ├── setup.py                   # Project setup
+│   ├── ui/                        # User interface components
+│   │   ├── components.py          # Basic UI components
+│   │   ├── document_components.py # Document generation components
+│   │   └── voice_components.py    # Voice interaction components
+│   └── utils/                     # Helper functions
+│       ├── arabic_utils.py        # Arabic language processing
+│       ├── case_analysis_utils.py # Legal case analysis
+│       ├── comparison_utils.py    # Law comparison
+│       ├── document_generation_utils.py # Document generation
+│       ├── document_utils.py      # Document processing
+│       ├── image_generation_utils.py # Document image generation
+│       ├── model_utils.py         # Model management
+│       ├── ollama_utils.py        # Ollama integration
+│       └── voice_utils.py         # Voice processing
+└── chroma_db/                     # ChromaDB database
 ```
 
-## 🚀 استخدام النظام
+## Usage
 
-<div dir="rtl">
-<h3>📝 دليل البدء السريع</h3>
+### Quick Start Guide
 
 <table>
   <tr>
-    <th>الخطوة</th>
-    <th>الوصف</th>
+    <th>Step</th>
+    <th>Description</th>
   </tr>
   <tr>
-    <td><strong>1. تحضير المستندات</strong></td>
-    <td>ضع المستندات القانونية العمانية (بصيغة PDF) في مجلد <code>src/data/</code></td>
+    <td><strong>1. Prepare Documents</strong></td>
+    <td>Place Omani legal documents (in PDF format) in the <code>src/data/</code> folder</td>
   </tr>
   <tr>
-    <td><strong>2. تشغيل التطبيق</strong></td>
-    <td>شغّل التطبيق باستخدام الأمر <code>streamlit run src/app.py</code></td>
+    <td><strong>2. Run the Application</strong></td>
+    <td>Run the application using the command <code>streamlit run src/app.py</code></td>
   </tr>
   <tr>
-    <td><strong>3. إعداد النظام</strong></td>
-    <td>انقر على زر <strong>"إعداد الكل"</strong> لتحميل المستندات وإنشاء التضمينات وتهيئة النظام دفعة واحدة</td>
+    <td><strong>3. Set Up the System</strong></td>
+    <td>Click the <strong>"Set Up All"</strong> button to load documents, create embeddings, and initialize the system in one go</td>
   </tr>
   <tr>
-    <td><strong>4. استخدام النظام</strong></td>
-    <td>استخدم واجهة المحادثة لطرح الأسئلة واستخدام الميزات المختلفة</td>
+    <td><strong>4. Use the System</strong></td>
+    <td>Use the chat interface to ask questions and use various features</td>
   </tr>
 </table>
 
-<h3>💬 ميزات النظام وكيفية استخدامها</h3>
+### System Features and How to Use Them
 
 <details>
-<summary>🔍 <strong>البحث عن المعلومات القانونية</strong></summary>
-<p>اكتب سؤالك في مربع المحادثة باللغة العربية أو الإنجليزية مثل:</p>
+<summary>🔍 <strong>Search for Legal Information</strong></summary>
+<p>Type your question in the chat box in Arabic or English such as:</p>
 <ul>
-  <li>"ما هي عقوبة السرقة وفقاً للقوانين العمانية؟"</li>
+  <li>"What is the penalty for theft according to Omani laws?"</li>
   <li>"What are the requirements for establishing a company in Oman?"</li>
 </ul>
 </details>
 
 <details>
-<summary>📝 <strong>استخراج مواد قانونية محددة</strong></summary>
-<p>اطلب مادة قانونية محددة بذكر رقمها والقانون الذي تنتمي إليه:</p>
+<summary>📝 <strong>Extract Specific Legal Articles</strong></summary>
+<p>Request a specific legal article by mentioning its number and the law it belongs to:</p>
 <ul>
-  <li>"أعطني المادة 150 من قانون الجزاء العماني"</li>
+  <li>"Show me Article 150 of the Omani Penal Code"</li>
   <li>"Show me Article 25 of the Omani Labor Law"</li>
 </ul>
 </details>
 
 <details>
-<summary>🔄 <strong>مقارنة القوانين</strong></summary>
-<p>استخدم كلمة "قارن" أو "compare" في سؤالك لمقارنة القوانين أو المواد:</p>
+<summary>🔄 <strong>Compare Laws</strong></summary>
+<p>Use the word "compare" in your question to compare laws or articles:</p>
 <ul>
-  <li>"قارن بين قانون العمل وقانون الخدمة المدنية فيما يتعلق بالإجازات"</li>
+  <li>"Compare the Labor Law and Civil Service Law regarding vacations"</li>
   <li>"Compare the regulations for commercial companies between different Omani laws"</li>
 </ul>
 </details>
 
 <details>
-<summary>🎤 <strong>التفاعل الصوتي</strong></summary>
-<p>استخدم الأزرار المخصصة للتفاعل الصوتي:</p>
+<summary>🎤 <strong>Voice Interaction</strong></summary>
+<p>Use the dedicated buttons for voice interaction:</p>
 <ul>
-  <li>انقر على زر <strong>"إدخال صوتي"</strong> لطرح سؤالك بالصوت</li>
-  <li>انقر على زر <strong>"قراءة بصوت عالٍ"</strong> لسماع الإجابة</li>
+  <li>Click the <strong>"Voice Input"</strong> button to ask your question by voice</li>
+  <li>Click the <strong>"Read Aloud"</strong> button to hear the answer</li>
 </ul>
 </details>
 
 <details>
-<summary>📄 <strong>إنشاء المستندات القانونية</strong></summary>
-<p>استخدم قسم "إنشاء المستندات" لإنشاء مستندات قانونية مثل:</p>
+<summary>📄 <strong>Create Legal Documents</strong></summary>
+<p>Use the "Generate Documents" section to create legal documents such as:</p>
 <ul>
-  <li>عقود العمل</li>
-  <li>عقود الإيجار</li>
-  <li>عقود الخدمات</li>
-  <li>التفويضات القانونية</li>
+  <li>Employment contracts</li>
+  <li>Lease agreements</li>
+  <li>Service contracts</li>
+  <li>Legal authorizations</li>
 </ul>
 </details>
 
 <details>
-<summary>📊 <strong>تحليل السيناريوهات القانونية وإنشاء التقارير</strong></summary>
-<p>قدم سيناريو قانوني واقعي واطلب تحليله وإنشاء تقرير PDF مثل:</p>
+<summary>📊 <strong>Analyze Legal Scenarios and Generate Reports</strong></summary>
+<p>Present a realistic legal scenario and request its analysis and PDF report generation:</p>
 <ul>
-  <li>"مواطن استثمر أموالاً في الخارج بدون أن يصرح بها للسلطات العمانية، ما هي الآثار القانونية؟"</li>
-  <li>"شركة قامت بتسريح موظف دون إشعار مسبق، ما هي حقوق الموظف وفقاً للقانون العماني؟ أريد تقرير PDF"</li>
+  <li>"A citizen invested money abroad without declaring it to Omani authorities. What are the legal implications?"</li>
+  <li>"A company terminated an employee without prior notice. What are the employee's rights according to Omani law? I need a PDF report"</li>
 </ul>
 </details>
-</div>
 
-## 💡 أمثلة على الاستخدام
+## Examples
 
-<div dir="rtl">
 <div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-between;">
 
 <div style="flex: 1; min-width: 300px; background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #1E3A8A;">
-<h3>🔎 البحث عن المعلومات القانونية</h3>
+<h3>🔎 Searching for Legal Information</h3>
 
 ```
-ما هي عقوبة السرقة وفقًا للقوانين العمانية؟
+What is the penalty for theft according to Omani laws?
 ```
 
 ```
